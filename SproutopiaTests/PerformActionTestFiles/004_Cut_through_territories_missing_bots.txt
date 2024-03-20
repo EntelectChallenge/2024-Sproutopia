@@ -1,0 +1,27 @@
+Start:
+.........
+.AAA.BBB.
+.AAA.BBB.
+.AAA.BBB.
+.........
+.DDD.CCC.
+.DDD.CCC.
+.DDD.CCC.
+.........
+
+StartingPositions: 2,2|7,1|7,7|1,7
+
+Actions: AE,AE,AE,AE,AS,AS,AS,AS,AW,AW,AW,AW,AN,AN,AN
+
+Expected:
+.........
+.AAA.BBB.
+.AAAAAAB.
+.AAAAAAB.
+..AAAAA..
+.DAAAAAC.
+.DAAAAAC.
+.DDD.CCC.
+.........
+
+PrunedBots:
