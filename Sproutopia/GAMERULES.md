@@ -39,15 +39,6 @@ Sproutopia was once an empty land, waiting for someone to give it life. Then cam
 But be careful! There are other farmers in Sproutopia, and they might try to hinder you. Keep an eye out for them!
 
 ---
-## The Game
-
-Sproutopia is the official territorial stylized game for the Entelect Challenge 2024. 🌿
-
-Sproutopia was once an empty land, waiting for someone to give it life. Then came the farmers/ bots , claiming land for their crops to grow. The farmers have to work hard to collect as much land as they can before time runs out.
-
-But be careful! There are other farmers in Sproutopia, and they might try to hinder you. Keep an eye out for them!
-
----
 
 ## General
 
