@@ -112,12 +112,29 @@ public class GardenManager : IGardenManager
 
     public void AddPowerUp()
     {
-        var newId = Guid.NewGuid();
-
         var newPosition = FindNewPowerUpPosition();
 
         if (newPosition != null)
-            _powerUps[newId] = new PowerUp(Helpers.RandomEnumValue<PowerUpType>(_randomizer.random), newPosition);
+        {
+            var powerUp = new PowerUp(Helpers.RandomEnumValue<PowerUpType>(_randomizer.random), newPosition);
+            _powerUps[powerUp.Id] = powerUp;
+        }
+    }
+
+    public void RemovePowerUp<T>(Guid powerUpId) where T : Enum
+    {
+        if (typeof(T) == typeof(PowerUpType))
+        {
+            _powerUps.Remove(powerUpId);
+        }
+        else if (typeof(T) == typeof(SuperPowerUpType))
+        {
+            _superPowerUps.Remove(powerUpId);
+        }
+        else
+        {
+            throw new ArgumentException("Unknown PowerUp type specified", nameof(T));
+        }
     }
 
     public int WeedCount()
@@ -297,8 +314,8 @@ public class GardenManager : IGardenManager
         var botGarden = GetGardenById(botId) ?? throw new ApplicationException("GardenManager has no garden for bot");
         var currentPosition = _botManager.GetBotState(botId).Position;
         var newPosition = currentPosition.Offset(action);
-        PowerUpType? powerUpExcavated = null;
-        SuperPowerUpType? superPowerUpExcavated = null;
+        PowerUp? powerUpExcavated = null;
+        SuperPowerUp? superPowerUpExcavated = null;
         List<Guid> weedsCleared = [];
 
         // Decrement bot's powerup countdowns
@@ -309,24 +326,26 @@ public class GardenManager : IGardenManager
         {
             return new BotResponse
             {
-                NewPosition = currentPosition
+                NewPosition = currentPosition,
+                Momentum = bot.Momentum
             };
         }
 
         // Will command take bot out of bounds?
         if (!newPosition.WithinBounds(_width, _height))
         {
-            // Use last bot command in stead
-            action = bot.LastCommand.Action;
+            // Maintain momentum in stead
+            action = bot.Momentum;
             newPosition = currentPosition.Offset(action);
 
-            // Will last command still take bot out of bounds?
+            // Will momentum still take bot out of bounds?
             if (!newPosition.WithinBounds(_width, _height))
             {
                 // Don't move bot
                 return new BotResponse
                 {
-                    NewPosition = currentPosition
+                    NewPosition = currentPosition,
+                    Momentum = BotAction.IDLE
                 };
             }
         }
@@ -345,7 +364,8 @@ public class GardenManager : IGardenManager
             {
                 return new BotResponse
                 {
-                    NewPosition = currentPosition
+                    NewPosition = currentPosition,
+                    Momentum = bot.Momentum
                 };
             }
         }
@@ -361,9 +381,9 @@ public class GardenManager : IGardenManager
                 if (otherBot.IsActive(PowerUpType.Unprunable))
                 {
                     if (otherGarden.HasTrail)
-                        otherBot.Position = new CellCoordinate(otherGarden.Trail!.StartPoint);
+                        otherBot.SetPosition(new CellCoordinate(otherGarden.Trail!.StartPoint), BotAction.IDLE);
                     else
-                        otherBot.Position = otherBot.RespawnPosition;
+                        otherBot.SetPosition(otherBot.RespawnPosition, BotAction.IDLE);
 
                     otherBot.ClearQueue();
                     otherGarden.ClearTrail();
@@ -378,6 +398,7 @@ public class GardenManager : IGardenManager
                     return new BotResponse
                     {
                         NewPosition = newPosition,
+                        Momentum = BotAction.IDLE,
                         Alive = false,
                         BotsPruned = prunedBots,
                         BotsInterrupted = interruptedBots,
@@ -400,6 +421,7 @@ public class GardenManager : IGardenManager
             return new BotResponse
             {
                 NewPosition = newPosition,
+                Momentum = BotAction.IDLE,
                 Alive = false,
                 BotsPruned = prunedBots,
                 BotsInterrupted = interruptedBots,
@@ -418,7 +440,7 @@ public class GardenManager : IGardenManager
                 // Check if other bot has Unprunable powerup active
                 if (otherBot.IsActive(PowerUpType.Unprunable))
                 {
-                    otherBot.Position = new CellCoordinate(trailGarden.Trail!.StartPoint);
+                    otherBot.SetPosition(new CellCoordinate(trailGarden.Trail!.StartPoint), BotAction.IDLE);
                     otherBot.ClearQueue();
                     trailGarden.ClearTrail();
                     interruptedBots.Add(trailGarden.Id);
@@ -433,39 +455,46 @@ public class GardenManager : IGardenManager
             {
                 // Severed trail belongs to self
 
-                // Check if bot has Trail Protection active
-                if (bot.IsActive(SuperPowerUpType.TrailProtection))
+                // If bot is in IDLE state, it means it's either stuck against a wall or recently respawned
+                // without momentum. In either case, this does not constitute a collision with its own trail
+                if (bot.Momentum != BotAction.IDLE)
                 {
-                    bot.ClearActiveSuperPowerUp();
-                    return new BotResponse
+                    // Check if bot has Trail Protection active
+                    if (bot.IsActive(SuperPowerUpType.TrailProtection))
                     {
-                        NewPosition = new CellCoordinate(botGarden.Trail!.StartPoint),
-                        Alive = true,
-                        BotsPruned = prunedBots,
-                        BotsInterrupted = interruptedBots,
-                    };
-                }
-                else
-                {
-                    prunedBots.Add(botId);
-                    PruneGarden(botId);
+                        bot.ClearActiveSuperPowerUp();
+                        return new BotResponse
+                        {
+                            NewPosition = new CellCoordinate(botGarden.Trail!.StartPoint),
+                            Momentum = BotAction.IDLE,
+                            Alive = true,
+                            BotsPruned = prunedBots,
+                            BotsInterrupted = interruptedBots,
+                        };
+                    }
+                    else
+                    {
+                        prunedBots.Add(botId);
+                        PruneGarden(botId);
 
-                    return new BotResponse
-                    {
-                        NewPosition = newPosition,
-                        Alive = false,
-                        BotsPruned = prunedBots,
-                        BotsInterrupted = interruptedBots,
-                    };
+                        return new BotResponse
+                        {
+                            NewPosition = newPosition,
+                            Momentum = BotAction.IDLE,
+                            Alive = false,
+                            BotsPruned = prunedBots,
+                            BotsInterrupted = interruptedBots,
+                        };
+                    }
                 }
             }
         }
 
         // Check if powerup is excavated
-        powerUpExcavated = _powerUps.Values.FirstOrDefault(p => p.Position == newPosition)?.PowerUpType;
+        powerUpExcavated = _powerUps.Values.FirstOrDefault(p => p.Position == newPosition);
 
         // Check if super powerup is excavated
-        superPowerUpExcavated = _superPowerUps.Values.FirstOrDefault(p => p.Position == newPosition)?.PowerUpType;
+        superPowerUpExcavated = _superPowerUps.Values.FirstOrDefault(p => p.Position == newPosition);
 
         // If Super Fertilizer is active, expand territory
         if (bot.IsActive(SuperPowerUpType.SuperFertilizer))
@@ -511,7 +540,7 @@ public class GardenManager : IGardenManager
                 // Check if new claimed territory entirely covers a weed
                 foreach (var weed in _weeds.Values.Where(w => _gardens[botId].ClaimedLand.Covers(w.OvergrownLand)))
                 {
-                    weedsCleared.Add(weed.Id);                    
+                    weedsCleared.Add(weed.Id);
                     var newSuperPowerUp = new SuperPowerUp(weed.CorePowerUp, weed.StartingPosition);
                     _superPowerUps[newSuperPowerUp.Id] = newSuperPowerUp;
                 }
@@ -531,6 +560,7 @@ public class GardenManager : IGardenManager
         return new BotResponse
         {
             NewPosition = newPosition,
+            Momentum = action,
             Alive = true,
             BotsPruned = prunedBots,
             BotsInterrupted = interruptedBots,
@@ -611,6 +641,7 @@ public class GardenManager : IGardenManager
         return new BotResponse
         {
             NewPosition = respawnPosition,
+            Momentum = BotAction.IDLE,
             Alive = true
         };
     }

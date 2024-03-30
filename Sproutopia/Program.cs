@@ -1,6 +1,7 @@
 ﻿using Domain.Enums;
 using Domain.Interfaces;
 using Domain.Models;
+using Logger.Utilities;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.SignalR.Client;
@@ -101,7 +102,7 @@ namespace Sproutopia
 
                 var connection = new HubConnectionBuilder().WithUrl(signalRConfig["RunnerURL"]).Build();
 
-                Console.WriteLine($"SignalR Config{signalRConfig["RunnerURL"]}");
+                Console.WriteLine($"SignalR Config: {signalRConfig["RunnerURL"]}");
 
                 connection.KeepAliveInterval = TimeSpan.FromSeconds(1000);
                 connection.ServerTimeout = TimeSpan.FromSeconds(1000);
@@ -115,6 +116,8 @@ namespace Sproutopia
             catch (Exception ex)
             {
                 await cloudIntegrationService.Announce(CloudCallbackType.Failed, ex);
+                await S3.UploadLogs();
+                await cloudIntegrationService.Announce(CloudCallbackType.LoggingComplete);
             }
         }
     }

@@ -116,6 +116,7 @@ namespace Sproutopia
                 Log.Error(failReason);
 
                 _cloudIntegrationService.Announce(CloudCallbackType.Failed, new Exception(failReason)).Wait();
+                _hubConnection.SendAsync("GameFailed", failReason, _gameState.Seed, 0).Wait();
             }
         }
     }

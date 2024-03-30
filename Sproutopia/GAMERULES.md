@@ -39,16 +39,6 @@ Sproutopia was once an empty land, waiting for someone to give it life. Then cam
 But be careful! There are other farmers in Sproutopia, and they might try to hinder you. Keep an eye out for them!
 
 ---
-## The Game
-
-Sproutopia is the official territorial stylized game for the Entelect Challenge 2024. 🌿
-
-Sproutopia was once an empty land, waiting for someone to give it life. Then came the farmers/ bots , claiming land for their crops to grow. The farmers have to work hard to collect as much land as they can before time runs out.
-
-But be careful! There are other farmers in Sproutopia, and they might try to hinder you. Keep an eye out for them!
-
----
-
 ## General
 
 📒 _Note: All configuration is subject to change while we balance the game. For the latest configurations please navigate to `2024-Sproutopia/Sproutopia` for `appsettings.json`, `appsettings.Development.json` and `appsettings.Production.json`.
@@ -183,4 +173,4 @@ When a farmer has every block of territory, the game ends and that hero is the w
 
 ## Scoring 
 
-Farmers (`Bots`) get scores based on the amount of `territory` obtained. You get bonus points for bigger sections of territory claimed (example : 25 tiles <= 1 times. 50 tiles <= 1.5 times. 75 tiles <= 2 times etc). 
+Farmers (`Bots`) get scores based on the amount of `territory` obtained. You get bonus points for bigger sections of territory claimed (example : 25 tiles <= 1 times. 50 tiles <= 1.5 times. 75 tiles <= 2 times etc).

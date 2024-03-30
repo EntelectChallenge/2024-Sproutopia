@@ -33,6 +33,13 @@ namespace Sproutopia.Managers
         public void AddPowerUp();
 
         /// <summary>
+        /// Removes a specified powerup or super powerup from the game world
+        /// </summary>
+        /// <typeparam name="T">Type of powerup (PowerUpType / SuperPowerUpType)</typeparam>
+        /// <param name="powerUpId">Id of powerup or super powerup to remove</param>
+        public void RemovePowerUp<T>(Guid powerUpId) where T : Enum;
+
+        /// <summary>
         /// Returns the number of weeds in the game world
         /// </summary>
         /// <returns>int</returns>

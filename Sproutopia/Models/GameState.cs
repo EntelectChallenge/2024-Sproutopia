@@ -64,17 +64,19 @@ namespace Sproutopia.Models
 
             if (botResponse.NewPosition != null)
             {
-                BotManager.SetBotPosition(command.BotId, botResponse.NewPosition);
+                BotManager.SetBotPosition(command.BotId, botResponse.NewPosition, botResponse.Momentum);
             }
 
             if (botResponse.PowerUpExcavated != null)
             {
-                BotManager.SetPowerUp(command.BotId, botResponse.PowerUpExcavated);
+                BotManager.SetPowerUp(command.BotId, botResponse.PowerUpExcavated.PowerUpType);
+                GardenManager.RemovePowerUp<PowerUpType>(botResponse.PowerUpExcavated.Id);
             }
 
             if (botResponse.SuperPowerUpExcavated != null)
             {
-                BotManager.SetSuperPowerUp(command.BotId, botResponse.SuperPowerUpExcavated);
+                BotManager.SetSuperPowerUp(command.BotId, botResponse.SuperPowerUpExcavated.PowerUpType);
+                GardenManager.RemovePowerUp<SuperPowerUpType>(botResponse.SuperPowerUpExcavated.Id);
             }
 
             return (botResponse.BotsPruned, botResponse.BotsInterrupted);

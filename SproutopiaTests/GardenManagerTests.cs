@@ -1,4 +1,5 @@
 using Domain;
+using Domain.Models;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.Extensions.Options;
 using NetTopologySuite.Geometries;
@@ -74,28 +75,32 @@ public class GardenManagerTests
                     gardenManager.PerformAction(
                         new("23d7b429-4abf-4bb4-8a78-0ee0b55f74c0"),
                         BotAction.Right)
-                    .NewPosition!);
+                    .NewPosition!,
+                    BotAction.IDLE);
 
                 _botManager.SetBotPosition(
                     new("7542d58c-a331-4ac3-8947-e5b93780e7f1"),
                     gardenManager.PerformAction(
                         new("7542d58c-a331-4ac3-8947-e5b93780e7f1"),
                         BotAction.Down)
-                    .NewPosition!);
+                    .NewPosition!,
+                    BotAction.IDLE);
 
                 _botManager.SetBotPosition(
                     new("518887fc-d588-464c-952d-91307db2e412"),
                     gardenManager.PerformAction(
                         new("518887fc-d588-464c-952d-91307db2e412"),
                         BotAction.Left)
-                    .NewPosition!);
+                    .NewPosition!,
+                    BotAction.IDLE);
 
                 _botManager.SetBotPosition(
                     new("5a2d6764-8c3f-4fc6-9bee-d9d991b00d93"),
                     gardenManager.PerformAction(
                         new("5a2d6764-8c3f-4fc6-9bee-d9d991b00d93"),
                         BotAction.Up)
-                    .NewPosition!);
+                    .NewPosition!,
+                    BotAction.IDLE);
             }
 
         // Act
@@ -552,10 +557,13 @@ public class GardenManagerTests
         BotResponse botResponse = new BotResponse();
         foreach (var (bot, action) in testData.actions)
         {
+            _botManager.GetBotState(id[bot]).EnqueueCommand(new SproutBotCommand(id[bot], action));
+            _botManager.GetBotState(id[bot]).DequeueCommand();
+
             botResponse = gardenManager.PerformAction(id[bot], action);
             if (botResponse.NewPosition != null)
             {
-                _botManager.SetBotPosition(id[bot], botResponse.NewPosition);
+                _botManager.SetBotPosition(id[bot], botResponse.NewPosition, botResponse.Momentum);
             }
         }
         var finalWorld = gardenManager.ViewGardens();

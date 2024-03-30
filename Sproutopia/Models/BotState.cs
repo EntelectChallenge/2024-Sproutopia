@@ -11,8 +11,9 @@ namespace Sproutopia.Models
         public readonly string Nickname;
         private Queue<SproutBotCommand> _commandQueue;
         public SproutBotCommand LastCommand { get; private set; }
+        public BotAction Momentum { get; private set; }
         public Guid BotId { get; private set; }
-        public CellCoordinate Position { get; set; }
+        public CellCoordinate Position { get; private set; }
         public CellCoordinate RespawnPosition { get; set; }
         private PowerUpType? _powerUpActive { get; set; } = null;
         private int _powerUpCountdown { get; set; } = 0;
@@ -25,6 +26,7 @@ namespace Sproutopia.Models
             _commandQueue = new();
             BotId = botId;
             LastCommand = new(botId, BotAction.IDLE);
+            Momentum = BotAction.IDLE;
             TieBreakingPoints = 0;
             ConnectionId = connectionId;
             Nickname = nickname;
@@ -35,8 +37,15 @@ namespace Sproutopia.Models
             _commandQueue = new();
             BotId = botId;
             LastCommand = new(botId, BotAction.IDLE);
+            Momentum = BotAction.IDLE;
             TieBreakingPoints = 0;
             Position = RespawnPosition = position;
+        }
+
+        public void SetPosition(CellCoordinate position, BotAction momentum)
+        {
+            Position = position;
+            Momentum = momentum;
         }
 
         /// <summary>
@@ -156,6 +165,7 @@ namespace Sproutopia.Models
         {
             _commandQueue.Clear();
             LastCommand = new(BotId, BotAction.IDLE);
+            Momentum = BotAction.IDLE;
         }
     }
 }

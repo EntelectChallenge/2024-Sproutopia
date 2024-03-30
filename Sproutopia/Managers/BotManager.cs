@@ -1,4 +1,5 @@
-﻿using Domain.Models;
+﻿using Domain;
+using Domain.Models;
 using Microsoft.Extensions.Options;
 using Sproutopia.Enums;
 using Sproutopia.Models;
@@ -43,14 +44,14 @@ namespace Sproutopia.Managers
             _bots[botState.BotId] = botState;
         }
 
-        public void SetBotPosition(Guid botId, CellCoordinate position)
+        public void SetBotPosition(Guid botId, CellCoordinate position, BotAction momentum)
         {
             if (!_bots.ContainsKey(botId))
             {
                 throw new ArgumentException("Unknown bot", nameof(botId));
             }
 
-            _bots[botId].Position = position;
+            _bots[botId].SetPosition(position, momentum);
         }
 
         public void SetPowerUp(Guid botId, PowerUpType? powerUpType)
@@ -94,7 +95,7 @@ namespace Sproutopia.Managers
                 throw new ArgumentException("Unknown bot", nameof(botId));
             }
 
-            _bots[botId].Position = _bots[botId].RespawnPosition;
+            _bots[botId].SetPosition(_bots[botId].RespawnPosition, BotAction.IDLE);
             _bots[botId].ClearActivePowerUp();
             _bots[botId].ClearActiveSuperPowerUp();
             ClearQueue(botId);

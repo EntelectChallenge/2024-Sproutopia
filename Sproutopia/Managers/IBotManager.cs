@@ -1,4 +1,5 @@
-﻿using Domain.Models;
+﻿using Domain;
+using Domain.Models;
 using Sproutopia.Enums;
 using Sproutopia.Models;
 
@@ -16,7 +17,7 @@ namespace Sproutopia.Managers
 
         public void SetBotState(BotState botState);
 
-        public void SetBotPosition(Guid botId, CellCoordinate position);
+        public void SetBotPosition(Guid botId, CellCoordinate position, BotAction momentum);
 
         public void SetPowerUp(Guid botId, PowerUpType? powerUpType);
 

@@ -1,4 +1,6 @@
-﻿using Domain.Models;
+﻿using Domain.Enums;
+using Domain.Models;
+using Logger.Utilities;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
@@ -32,7 +34,7 @@ namespace Sproutopia
             ICloudIntegrationService cloudIntegrationService,
             GlobalSeededRandomizer randomizer,
             IHubContext<RunnerHub> runnerContext
-            )
+        )
         {
             _gameState = gameState;
             _gameSettings = settings.Value;
@@ -48,29 +50,42 @@ namespace Sproutopia
                 .Enrich.FromLogContext()
                 .Enrich.WithProperty("Application", "Sproutopia")
                 .MinimumLevel.Information()
-               .WriteTo.File("logs\\engGame.json")
+                .WriteTo.File("logs\\engGame.json")
                 .CreateLogger();
 
             _gameLogger = new LoggerConfiguration()
                 .Enrich.FromLogContext()
                 .MinimumLevel.Information()
-               .WriteTo.File("log.gz", hooks: new GZipHooks(), outputTemplate: "{Message}{NewLine}{Expression}")
+                .WriteTo.File("log.gz", hooks: new GZipHooks(), outputTemplate: "{Message}{NewLine}{Expression}")
                 .CreateLogger();
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
+            try
+            {
+                await GameLoop(stoppingToken);
+            }
+            catch (Exception e)
+            {
+                Log.Error($"Game failed with exception: {e.Message}");
+                await HandleCriticalException(e);
+            }
+        }
+
+        private async Task GameLoop(CancellationToken stoppingToken)
+        {
             var nextWeedSpawn = (int)_randomizer.NextNormal(
-                            _gameSettings.WeedSpawnRateMean,
-                            _gameSettings.WeedSpawnRateStdDev,
-                            _gameSettings.WeedSpawnRateMin,
-                            _gameSettings.WeedSpawnRateMax);
+                _gameSettings.WeedSpawnRateMean,
+                _gameSettings.WeedSpawnRateStdDev,
+                _gameSettings.WeedSpawnRateMin,
+                _gameSettings.WeedSpawnRateMax);
 
             var nextPowerUpSpawn = (int)_randomizer.NextNormal(
-                            _gameSettings.PowerUpSpawnRateMean,
-                            _gameSettings.PowerUpSpawnRateStdDev,
-                            _gameSettings.PowerUpSpawnRateMin,
-                            _gameSettings.PowerUpSpawnRateMax);
+                _gameSettings.PowerUpSpawnRateMean,
+                _gameSettings.PowerUpSpawnRateStdDev,
+                _gameSettings.PowerUpSpawnRateMin,
+                _gameSettings.PowerUpSpawnRateMax);
 
             while (!stoppingToken.IsCancellationRequested)
             {
@@ -78,13 +93,13 @@ namespace Sproutopia
                 {
                     if (!_gameState.GameOver)
                     {
-
                         Log.Debug($"TICK: {_tickManager.CurrentTick}");
 
                         var respawnList = new List<Guid>();
                         var interruptedList = new List<Guid>();
 
                         #region STAGE 1
+
                         // STAGE 1
                         // For each bot CommandQueue
                         // Pop one command off the queue
@@ -95,10 +110,13 @@ namespace Sproutopia
                             Log.Debug($"{botState.BotId}: PROCESSING First Command In Queue");
                             sproutBotCommands.Add(botState.DequeueCommand());
                         }
+
                         sproutBotCommands.Sort();
+
                         #endregion
 
                         #region STAGE 2
+
                         // STAGE 2
                         // For Each bot
                         // Check if bot is in the respawn list
@@ -125,18 +143,22 @@ namespace Sproutopia
                             respawnList.AddRange(pruned.Except(respawnList));
                             interruptedList.AddRange(interrupted.Except(interruptedList));
                         }
+
                         #endregion
 
                         #region STAGE 3
+
                         // STAGE 3
                         // Respawn bots flagged for respawn (instruction to GardenManager)
                         foreach (var prunedBot in respawnList)
                         {
                             _gameState.RespawnBot(prunedBot);
                         }
+
                         #endregion
 
                         #region STAGE 4
+
                         // STAGE 4
                         // Decide whether or not to spawn a power-up or grow a weed
 
@@ -170,24 +192,27 @@ namespace Sproutopia
                                     _gameSettings.PowerUpSpawnRateMax);
                             }
                         }
+
                         #endregion
 
                         #region STAGE 5
+
                         // STAGE 5
                         // Send feedback to bots & Visualiser
                         // Update GameState and BotState
                         _gameState.UpdateState(_tickManager.CurrentTick);
 #if DEBUG
-                        await _visualiserContext.Clients.All.SendAsync(VisualiserCommands.ReceiveInitialGameState, _gameState.MapAllToDto());
+                        await _visualiserContext.Clients.All.SendAsync(VisualiserCommands.ReceiveInitialGameState,
+                            _gameState.MapAllToDto());
 #endif
                         foreach (var bot in _gameState.BotManager.GetAllBotStates())
                         {
-
                             await _runnerContext.Clients.Client(bot.Value.ConnectionId)
                                 .SendAsync(RunnerCommands.ReceiveBotState, _gameState.MapToBotDto(bot.Key));
 
                             _gameLogger.Information("{@_gameState}", _gameState.MapAllToDto());
                         }
+
                         #endregion
                     }
                 }
@@ -237,24 +262,47 @@ namespace Sproutopia
                 var currentBot = posistion.bot.botId;
                 int matchPoint = gameComplete.Players.Find(p => string.Equals(p.Id, currentBot.ToString())).MatchPoints;
                 int totalPoint = gameComplete.Players.Find(p => string.Equals(p.Id, currentBot.ToString())).Score;
-                _cloudIntegrationService.UpdatePlayer(currentBot.ToString(), finalScore: totalPoint, matchPoints: matchPoint, placement: posistion.index + 1);
-
+                _cloudIntegrationService.UpdatePlayer(currentBot.ToString(), finalScore: totalPoint,
+                    matchPoints: matchPoint, placement: posistion.index + 1);
             }
 
             // Log.File(gameComplete, null, "GameComplete");
             //Hand off ot Logger to handel end game state
             //Disconnect all bots
-            await _runnerContext.Clients.All.SendAsync(RunnerCommands.EndGame, _gameSettings.Seed, _gameState.CurrentTick);
+            await _runnerContext.Clients.All.SendAsync(RunnerCommands.EndGame, _gameSettings.Seed,
+                _gameState.CurrentTick);
 #if DEBUG
             await _visualiserContext.Clients.All.SendAsync("GameComplete", _gameSettings.Seed, _gameState.CurrentTick);
 #endif
+
             #region End Game Logging
+
             _endGameLogger.Information("{@gameComplete}", gameComplete);
+
             #endregion
 
-            Log.CloseAndFlush();
+            await AnnounceCompletion();
             await StopAsync(stoppingToken);
         }
-    }
 
+        private async Task AnnounceCompletion()
+        {
+            await Log.CloseAndFlushAsync();
+            await _cloudIntegrationService.Announce(CloudCallbackType.Finished, null, _gameState.Seed,
+                _gameState.CurrentTick);
+            await S3.UploadLogs();
+            await _cloudIntegrationService.Announce(CloudCallbackType.LoggingComplete);
+        }
+
+        private async Task HandleCriticalException(Exception e)
+        {
+            await Log.CloseAndFlushAsync();
+            await _runnerContext.Clients.All.SendAsync(RunnerCommands.Disconnect,
+                "A critical error prevented the game from completing");
+            await _cloudIntegrationService.Announce(CloudCallbackType.Failed, e, _gameState.Seed,
+                _gameState.CurrentTick);
+            await S3.UploadLogs();
+            await _cloudIntegrationService.Announce(CloudCallbackType.LoggingComplete);
+        }
+    }
 }
