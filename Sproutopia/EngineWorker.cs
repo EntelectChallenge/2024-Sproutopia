@@ -205,13 +205,16 @@ namespace Sproutopia
                         await _visualiserContext.Clients.All.SendAsync(VisualiserCommands.ReceiveInitialGameState,
                             _gameState.MapAllToDto());
 #endif
-                        foreach (var bot in _gameState.BotManager.GetAllBotStates())
-                        {
-                            await _runnerContext.Clients.Client(bot.Value.ConnectionId)
-                                .SendAsync(RunnerCommands.ReceiveBotState, _gameState.MapToBotDto(bot.Key));
 
-                            _gameLogger.Information("{@_gameState}", _gameState.MapAllToDto());
-                        }
+                        await Parallel.ForEachAsync(_gameState.BotManager.GetAllBotStates(), async (bot, cancellationToken) => {
+                            await _runnerContext.Clients.Client(bot.Value.ConnectionId).SendAsync(
+                                    RunnerCommands.ReceiveBotState,
+                                    _gameState.MapToBotDto(bot.Key),
+                                    cancellationToken
+                            );
+                        });
+
+                        _gameLogger.Information("{@_gameState}", _gameState.MapAllToDto());
 
                         #endregion
                     }

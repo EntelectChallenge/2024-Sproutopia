@@ -61,7 +61,7 @@ namespace Sproutopia
                         services.AddSingleton<GameState>();
                         services.AddSingleton<IBotManager, BotManager>();
                         services.AddSingleton<IGardenManager, GardenManager>();
-                        services.AddSingleton<RunnerHub>();
+                        services.AddTransient<RunnerHub>();
                         services.AddSignalR(options =>
                         {
                             //Uncomment for detailed error log for SignalR
