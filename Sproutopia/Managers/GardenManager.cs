@@ -638,6 +638,12 @@ public class GardenManager : IGardenManager
 
         _gardens[botId] = new Garden(botId, polygon);
 
+        // Check if new respawn territory covers any territory from another bot
+        foreach (var g in _gardens.Values.Where(g => g.Id != botId))
+        {
+            g.ClaimedLand = g.ClaimedLand.Difference(_gardens[botId].ClaimedLand);
+        }
+
         return new BotResponse
         {
             NewPosition = respawnPosition,
