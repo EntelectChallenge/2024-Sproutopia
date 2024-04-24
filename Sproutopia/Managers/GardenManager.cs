@@ -34,6 +34,22 @@ public class GardenManager : IGardenManager
         }
     }
 
+    public IEnumerable<CellCoordinate> GetGardenCellsById(Guid gardenId)
+    {
+        if (!_gardens.TryGetValue(gardenId, out var garden))
+            throw new ArgumentException("Garden not found", nameof(gardenId));
+
+        return garden.ClaimedLandAsCellCoordinates();
+    }
+
+    public IEnumerable<CellCoordinate> GetTrailCellsById(Guid gardenId)
+    {
+        if (!_gardens.TryGetValue(gardenId, out var garden))
+            throw new ArgumentException("Garden not found", nameof(gardenId));
+
+        return garden.TrailAsCellCoordinates();
+    }
+
     public GardenManager(IOptions<SproutopiaGameSettings> gameSettings, IBotManager botManager, GlobalSeededRandomizer randomizer)
         : this(gameSettings.Value.Cols, gameSettings.Value.Rows, botManager, randomizer)
     {
@@ -135,6 +151,16 @@ public class GardenManager : IGardenManager
         {
             throw new ArgumentException("Unknown PowerUp type specified", nameof(T));
         }
+    }
+
+    public Dictionary<CellCoordinate, PowerUpType> GetPowerUpTypes()
+    {
+        return _powerUps.ToDictionary(p => p.Value.Position, p => p.Value.PowerUpType);
+    }
+
+    public Dictionary<CellCoordinate, SuperPowerUpType> GetSuperPowerUpTypes()
+    {
+        return _superPowerUps.ToDictionary(p => p.Value.Position, p => p.Value.PowerUpType);
     }
 
     public int WeedCount()
@@ -317,6 +343,7 @@ public class GardenManager : IGardenManager
         PowerUp? powerUpExcavated = null;
         SuperPowerUp? superPowerUpExcavated = null;
         List<Guid> weedsCleared = [];
+        int areaClaimed = 0;
 
         // Decrement bot's powerup countdowns
         bot.PowerupsCountdown();
@@ -534,7 +561,23 @@ public class GardenManager : IGardenManager
 
             if (HasGardenCompletedTrail(botId))
             {
-                var encircledBots = CompleteTrail(botId);
+                var newClaimed = CompleteTrail(botId);
+                List<Guid> encircledBots = new();
+
+                // Check if newly claimed area covers any other bots and prune them if so
+                if (newClaimed != null)
+                {
+                    areaClaimed = (int)newClaimed.Area;
+                    foreach (var otherBot in _botManager.GetAllBotStates().Where(bp => bp.Key != botId))
+                    {
+                        if (newClaimed.Covers(new Point(otherBot.Value.Position.ToPointCoordinate(true))))
+                        {
+                            encircledBots.Add(otherBot.Key);
+                            TransferGarden(otherBot.Key, botId);
+                        }
+                    }
+                }
+
                 prunedBots.AddRange(encircledBots.Except(prunedBots));
 
                 // Check if new claimed territory entirely covers a weed
@@ -562,6 +605,7 @@ public class GardenManager : IGardenManager
             NewPosition = newPosition,
             Momentum = action,
             Alive = true,
+            AreaClaimed = areaClaimed,
             BotsPruned = prunedBots,
             BotsInterrupted = interruptedBots,
             PowerUpExcavated = powerUpExcavated,
@@ -771,10 +815,10 @@ public class GardenManager : IGardenManager
     /// Complete the trail, and add the land to the given garden.
     /// </summary>
     /// <param name="botId">The bot's garden to complete the loop for.</param>
-    /// <returns>True if the trail is completed, false if not.</returns>
-    internal List<Guid> CompleteTrail(Guid botId)
+    /// <returns>Newly claimed land</returns>
+    internal Geometry? CompleteTrail(Guid botId)
     {
-        List<Guid> prunedBots = new();
+        Geometry? newClaimed = null;
 
         if (!_gardens.TryGetValue(botId, out var garden))
             throw new ArgumentException("Garden not found", nameof(botId));
@@ -807,7 +851,9 @@ public class GardenManager : IGardenManager
             var trailGeo = garden.Trail.ToPointCoordinateSystem();
             var newPoly = territoryStart!.Union(territoryEnd).Union(trailGeo) as Polygon;
             var exterior = new Polygon(new LinearRing(newPoly!.ExteriorRing.Coordinates));
+            var oldClaimed = garden.ClaimedLand;
             garden.ClaimedLand = garden.ClaimedLand.Union(exterior);
+            newClaimed = garden.ClaimedLand.Difference(oldClaimed);
 
             // Reset trail
             garden.Trail = null;
@@ -818,25 +864,15 @@ public class GardenManager : IGardenManager
             var trailGeo = garden.Trail.ToPointCoordinateSystem();
             var newGeo = (territoryStart! as Polygon)!.Union(trailGeo);
             var exterior = new Polygon(new LinearRing((newGeo as Polygon)!.ExteriorRing.Coordinates));
-            var newClaimed = exterior.Difference(newGeo);
+            newClaimed = exterior.Difference(newGeo);
 
             garden.ClaimedLand = garden.ClaimedLand.Union(exterior);
-
-            // Check if newly claimed area covers any other bots and prune them if so
-            foreach (var otherBot in _botManager.GetAllBotStates().Where(bp => bp.Key != botId))
-            {
-                if (newClaimed.Covers(new Point(otherBot.Value.Position.ToPointCoordinate(true))))
-                {
-                    prunedBots.Add(otherBot.Key);
-                    TransferGarden(otherBot.Key, botId);
-                }
-            }
 
             // Reset trail
             garden.ClearTrail();
         }
 
-        return prunedBots;
+        return newClaimed;
     }
 
     /// <summary>

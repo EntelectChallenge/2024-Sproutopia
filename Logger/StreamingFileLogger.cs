@@ -10,31 +10,28 @@ namespace Logger
 
         public StreamingFileLogger(string fileName)
         {
-            var LOG_DIRECTORY = Path.Combine(AppContext.BaseDirectory[..AppContext.BaseDirectory.IndexOf("Sproutopia")], "Logs");
+            var LOG_DIRECTORY = Environment.GetEnvironmentVariable("LOG_DIR") ?? Path.Combine(AppContext.BaseDirectory[..AppContext.BaseDirectory.IndexOf("Sproutopia")], "Logs");
             Environment.SetEnvironmentVariable("LOG_DIR", LOG_DIRECTORY);
             LOG_PATH = Path.Combine(LOG_DIRECTORY, $"{fileName}.json.gz");
 
             Serilog.Log.Logger = new LoggerConfiguration()
                 .Enrich.FromLogContext()
                 .MinimumLevel.Debug()
-                .WriteTo.File(@"f:\log\log.txt")
+                .WriteTo.File(LOG_PATH)
                 .CreateLogger();
 
-            //  FileStream fileStream = new(LOG_PATH, FileMode.OpenOrCreate);
-            //  GZipStream gZipStream = new(fileStream, CompressionMode.Compress);
-            // stream = new(gZipStream);
-            //  stream.Write("[");
+            Serilog.Log.Information("[");
         }
 
         public void Log(object state)
         {
             Serilog.Log.Information("{@state}", state);
         }
+
         public async Task Close()
         {
-            await stream.WriteLineAsync("]");
-            stream.Close();
-            stream.Dispose();
+            Serilog.Log.Information("]");
+            Serilog.Log.CloseAndFlush();
         }
 
         Task IStreamingFileLogger.Log(object state)

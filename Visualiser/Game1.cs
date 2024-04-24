@@ -8,13 +8,12 @@ using Sproutopia.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Visualiser.Camera;
+using Visualiser.Utils.Camera;
 
 namespace Visualiser
 {
     public class Game1 : Game
     {
-        private bool tempTest = true;
         private GraphicsDeviceManager _graphics;
         private GraphicsDevice _graphicsDevice;
         private SpriteBatch _spriteBatch;
@@ -24,18 +23,29 @@ namespace Visualiser
         private LevelLoader levelLoader;
         private HubConnection connection;
         private static IConfigurationRoot Configuration;
+        private KeyboardState keyboardState;
+        private readonly IConfiguration GameConfig;
+        private IConfigurationBuilder GameConfigBuilder;
 
         private GameStateDto GameState { get; set; }
         private GameState[] GameStateLogs { get; }
         private CameraWindow[] _windows;
         private int _heroToFollow;
 
-        public bool _followHero;
+        #region Cursor
+        Vector2 _cursor;
+        public int _speed;
+        private Vector2 _minPos, _maxPos;
+        private Matrix _cursorTranslation;
+        #endregion
+
+        public bool _enableCursor = true;
         private int _currentTick { get; set; }
         private int _padding { get; set; }
         private int _initalPadding { get; set; }
         private Vector2 _botControllerPlacement { get; set; }
         private SpriteFont _arial { get; set; }
+
 
         #region Declare Textures
         Texture2D buttonPlayTexture;
@@ -44,6 +54,11 @@ namespace Visualiser
         private Texture2D TrailTexture;
         private Texture2D EmptyTexture;
         private List<Texture2D> PlayerTextures;
+
+        private Texture2D SuperFertizerTexture;
+        private Texture2D TerritoryImmunityTexture;
+        private Texture2D UnprunableTexture;
+        private Texture2D FreezeTexture;
         // private BotStateSprite botStateSprites;
 
         #endregion
@@ -60,62 +75,61 @@ namespace Visualiser
         public Game1()
         {
             _currentTick = 0;
-            _padding = 8;
-            _initalPadding = 125;
+            _initalPadding = 0;
             _heroToFollow = 0;
             _graphics = new(this);
+            _cursor = new(_initalPadding, 0);
             Content.RootDirectory = "Content";
-            IsMouseVisible = true;
             GameStateLogs = Array.Empty<GameState>();
             _mouseLeftPressed = false;
-            _followHero = false;
+            IsMouseVisible = true;
+            GameConfig = new ConfigurationBuilder()
+                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+                .AddJsonFile($"appsettings.Development.json", optional: true, reloadOnChange: true)
+                .AddEnvironmentVariables()
+                .Build();
         }
 
         protected override void Initialize()
         {
-            string environment;
-#if DEBUG
-            environment = "Development";
-#elif RELEASE
-            environment = "Production";
-#endif
-            /*
-                        Configuration = new ConfigurationBuilder()
-                        .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-                            .AddJsonFile($"appsettings.{environment}.json", optional: true, reloadOnChange: true)
-                            .AddEnvironmentVariables()
-                            .Build();
+            var GameSettings = GameConfig.GetSection("GameSettings");
+            var VisualiserSettings = GameConfig.GetSection("VisualiserSettings");
 
-                        var test = Configuration.GetSection("GameSettings");
-
-                        var rows = test.GetValue("Rows", 50);
-                        var cols = test.GetValue("Cols", 50);*/
-
-
-
-            _oneShotMouseState = OneShotMouseButton.GetState();
-
-            //TODO: how to make this configurable
-            levelLoader = new(_padding, 50, 50);
-            levelLoader.AddLevel(_initalPadding);
-
-            Console.WriteLine("Initialized bot windows...");
             #region Screen Options
             //* set to screen size * //
-            _graphics.PreferredBackBufferWidth = 1900;
-            _graphics.PreferredBackBufferHeight = 1000;
+            _graphics.PreferredBackBufferWidth = VisualiserSettings.GetValue<int>("WindowWidth");
+            _graphics.PreferredBackBufferHeight = VisualiserSettings.GetValue<int>("WindowHeight");
 
             //* apply changes * //
             _graphics.ApplyChanges();
             _graphicsDevice = _graphics.GraphicsDevice;
             #endregion
 
+            #region Asset Options
+            _padding = 16; //VisualiserSettings.GetValue<int>("AssetSize");
+            #endregion
+
+            #region Cursor Options
+            _enableCursor = VisualiserSettings.GetValue<bool>("EnableCursor");
+            _speed = VisualiserSettings.GetValue<int>("CursorSpeed");
+            #endregion
+
+            _oneShotMouseState = OneShotMouseButton.GetState();
+
+            var rows = GameSettings.GetValue<int>("Rows");
+            var columns = GameSettings.GetValue<int>("Cols");
+
+            levelLoader = new(_padding, rows, columns);
+            levelLoader.AddLevel(_initalPadding);
+
             _botControllerPlacement = new(20, _graphics.PreferredBackBufferHeight - 300);
 
+            #region SignalR Configs
             connection = new HubConnectionBuilder()
                 .WithUrl("http://localhost:5000/visualiserhub")
                 .WithAutomaticReconnect()
                 .Build();
+            #endregion
 
             base.Initialize();
         }
@@ -132,12 +146,22 @@ namespace Visualiser
             TrailTexture = Content.Load<Texture2D>("tiny_tile");
             EmptyTexture = Content.Load<Texture2D>("tiny_tile");
 
+
+
             PlayerTextures = new List<Texture2D>() {
                 Content.Load<Texture2D>("tiny_tile"),
                 Content.Load<Texture2D>("tiny_tile"),
                 Content.Load<Texture2D>("tiny_tile"),
                 Content.Load<Texture2D>("tiny_tile"),
             };
+
+            //PowerUps
+
+            this.SuperFertizerTexture = Content.Load<Texture2D>("PowerUps/superFertilizer");
+            this.FreezeTexture = Content.Load<Texture2D>("PowerUps/freeze2");
+            this.TerritoryImmunityTexture = Content.Load<Texture2D>("PowerUps/territoryImmunity2");
+            this.UnprunableTexture = Content.Load<Texture2D>("PowerUps/unprunable2");
+
             #endregion
 
             #region Load Buttons
@@ -155,8 +179,8 @@ namespace Visualiser
             _pauseButton = new(
                 staticImage: Content.Load<Texture2D>("pause"),
                 clickedImage: Content.Load<Texture2D>("pause"),
-                dimensions: new(64, 64),
-                position: new(0, 84),
+                dimensions: new(6, 68),
+                position: new(44, 0),
                 name: "pause",
                 id: 34,
                 visible: true,
@@ -175,8 +199,8 @@ namespace Visualiser
             _stepButton = new(
                 staticImage: Content.Load<Texture2D>("step"),
                 clickedImage: Content.Load<Texture2D>("step"),
-                dimensions: new(64, 64),
-                position: new(0, 158),
+                dimensions: new(64, 86),
+                position: new(90, 0),
                 name: "pause",
                 id: 35,
                 visible: true,
@@ -189,21 +213,29 @@ namespace Visualiser
             if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed || Keyboard.GetState().IsKeyDown(Keys.Escape))
                 Exit();
 
-            if (GameStateLogs.Length > 0)
-            {
-                //Update GameState with the current log
-            }
+            #region Keyboard Inputs 
+            keyboardState = Keyboard.GetState();
+
+            //Move map
+
+            var nextCursor = _cursor;
+
+            if (keyboardState.IsKeyDown(Keys.Up)) nextCursor.Y -= 1 * _speed;
+            if (keyboardState.IsKeyDown(Keys.Down)) nextCursor.Y += 1 * _speed;
+            if (keyboardState.IsKeyDown(Keys.Left)) nextCursor.X -= 1 * _speed;
+            if (keyboardState.IsKeyDown(Keys.Right)) nextCursor.X += 1 * _speed;
+
+            _cursor = Vector2.Clamp(nextCursor, new(_initalPadding, 0), new(_initalPadding + levelLoader.MapPxWidth - EmptyTexture.Width, levelLoader.MapPxHight - EmptyTexture.Height));
+            CalculateCursorTranslation();
+
+            #endregion
+
+            #region UI Inputs
 
             HandelInput(gameTime);
             _playToggleButton.UpdateButton();
             _pauseButton.UpdateButton();
             _stepButton.UpdateButton();
-            //       _continueButton.UpdateButton();
-
-            connection.On<string>(VisualiserCommands.SendDummyString, state =>
-            {
-                var dummyString = state;
-            });
 
             connection.On<GameStateDto>(VisualiserCommands.ReceiveInitialGameState, state =>
             {
@@ -227,9 +259,9 @@ namespace Visualiser
                         if (CheckIfButtonWasClicked(_stepButton))
                             connection.SendAsync("StepIntoGame").Wait();
                     }
-                    else if (CheckIfButtonWasClicked(_playToggleButton)) connection.StartAsync().Wait();
-
-
+                    else if (CheckIfButtonWasClicked(_playToggleButton)
+                        && connection.State != HubConnectionState.Reconnecting)
+                        connection.StartAsync().Wait();
                 }
                 catch (Exception ex)
                 {
@@ -237,29 +269,7 @@ namespace Visualiser
                 }
             }
 
-            /*            if (RunnerClient.connection != null)
-                        {
-                            if (RunnerClient.connection.State == HubConnectionState.Connected)
-                            {
-                                RunnerClient.connection.On<GameState>("RecieveInitialGameState", (state) =>
-                                {
-                                    InitialiseBotWindows();
-                                    GameState = state;
-                                });
-
-                                RunnerClient.connection.On<GameState>("RecieveChangeLog", (state) =>
-                                {
-                                    GameState = state;
-                                });
-                            }
-
-                        }*/
-
-            if (GameState is not null)
-            {
-                var gamestateTemp = GameState;
-            }
-
+            #endregion
 
             base.Update(gameTime);
         }
@@ -268,17 +278,10 @@ namespace Visualiser
         {
             GraphicsDevice.Clear(Color.LightGray);
 
-            _spriteBatch.Begin();
-
-            #region Draw UI 
-            _spriteBatch.Draw(_playToggleButton.Texture, _playToggleButton.Position, Color.White);
-            _spriteBatch.Draw(_pauseButton.Texture, _pauseButton.Position, Color.White);
-            _spriteBatch.Draw(_stepButton.Texture, _stepButton.Position, Color.White);
-            //  _spriteBatch.Draw(_continueButton.Texture, _continueButton.Position, Color.White);
-            #endregion
-
             if (GameState != null)
             {
+                _spriteBatch.Begin(transformMatrix: _cursorTranslation);
+
                 #region Draw Game State Window 
                 for (int r = 0; r < levelLoader.Rows; r++)
                 {
@@ -306,7 +309,7 @@ namespace Visualiser
                     var y = powerUp.Location.Y;
 
                     var position = levelLoader.Maps[x, y];
-                    DrawTile(position, powerUp.Type, GetPowerUpColor(powerUp.Type));
+                    DrawPowerUpTile(position, powerUp.Type, Color.White);
 
                 }
 
@@ -322,10 +325,26 @@ namespace Visualiser
 
                 #endregion
 
+
+                if (_enableCursor)
+                {
+                    DrawCursor(_cursor);
+                }
+                _spriteBatch.End();
             }
 
+            _spriteBatch.Begin();
+
+            #region Draw UI 
+            _spriteBatch.Draw(_playToggleButton.Texture, UIRectangle(_playToggleButton.Position, 40), Color.White);
+            _spriteBatch.Draw(_pauseButton.Texture, UIRectangle(_pauseButton.Position, 40), Color.White);
+            _spriteBatch.Draw(_stepButton.Texture, UIRectangle(_stepButton.Position, 40), Color.White);
+            //  _spriteBatch.Draw(_continueButton.Texture, _continueButton.Position, Color.White);
+            #endregion
 
             _spriteBatch.End();
+
+
 
             base.Draw(gameTime);
         }
@@ -343,105 +362,44 @@ namespace Visualiser
             }
         }
 
-        private Rectangle Rectangle(Point position) => new Rectangle(position.X, position.Y, _padding + 1, _padding + 1);
+        private Rectangle Rectangle(Point position) => new Rectangle(position.X, position.Y, _padding, _padding);
+        private Rectangle UIRectangle(Point position, int buttonSize) => new Rectangle(position.X, position.Y, buttonSize, buttonSize);
 
-        /*        private Matrix CalculateTranslation(CameraWindow window)
-                {
-                    //var dx = (size.X / 2) - position.X;
-                    //var dy = (size.Y / 2) - position.Y;
-                    // var dx = (_graphics.PreferredBackBufferWidth / 2) - x;
-                    // var dy = (_graphics.PreferredBackBufferHeight / 2) - y;
-
-                    var map = levelLoader.Maps;
-
-                //    var bot = GameState.Bots[window.BotIndex];
-                //    var normalisedPosition = map[bot.CurrentPosition.X, bot.CurrentPosition.X];
-
-        *//*            var dx = (window.RenderTarget.Width / 2) - normalisedPosition.X;
-                    var dy = (window.RenderTarget.Height / 2) - normalisedPosition.Y;
-        *//*
-
-                    var paddingA = _padding;
-
-                    *//*            dx = MathHelper.Clamp(dx, 500, _padding / 2);
-                                dy = MathHelper.Clamp(dy, 500, _padding / 2);*//*
-
-                    var mapSizeY = 4160;
-                    var mapSizeX = 4060;
-
-               //     dx = MathHelper.Clamp(dx, -mapSizeX + window.RenderTarget.Width + (-paddingA / 2), -paddingA / 2);
-               //     dy = MathHelper.Clamp(dy, -mapSizeY + window.RenderTarget.Height + (paddingA / 2), (paddingA) / 2);
-
-               //     return Matrix.CreateTranslation(dx, dy, 0f);
-                }*/
-
-        /*        private void DrawWindow(CameraWindow window)
-                {
-                    //Setting the "camera"
-                    _graphicsDevice.SetRenderTarget(window.RenderTarget);
-                    // var bot = cyFiLog[_currentTick].Bots[window.BotIndex];
-                    Point[,] map = levelLoader.Maps;
-                    var transform = CalculateTranslation(window);
-                    _spriteBatch.Begin(transformMatrix: transform);
-
-                    var mapSizeY = 4160;
-                    var mapSizeX = 4060;
+        private Rectangle PowerUpRectangle(Point position)
+        {
+            var percentageIncrease = _padding + (10 / 100);
+            var puSize = percentageIncrease + _padding;
+            return new(position.X - (percentageIncrease / 2), position.Y - (percentageIncrease / 2), puSize, puSize);
+        }
 
 
-                    //** Setting the background **
-                    var rectangleBackground = new Rectangle(0, -60, mapSizeX, mapSizeY);
-                    //_spriteBatch.Draw(backgroundTextures[bot.CurrentLevel], rectangleBackground, Color.White);
 
-                    //** Drawing the map **
+        private Matrix CalculateTranslation(CameraWindow window, VertexPosition cursor)
+        {
+            /*          var dx = (size.X / 2) - position.X;
+                        var dy = (size.Y / 2) - position.Y;
+                        var dx = (_graphics.PreferredBackBufferWidth / 2) - x;
+                        var dy = (_graphics.PreferredBackBufferHeight / 2) - y;
+            */
+            var map = levelLoader.Maps;
 
-        *//*            for (int r = 0; r < GameState.Land.GetLength(0); r++)
-                    {
-                        for (int c = 0; c < GameState.Land.GetLength(r); c++)
-                        {
-                            var position = map[r, c];
-                            DrawTile(position, (int)GameState.Land[r][c]);
+            var dx = (window.RenderTarget.Width / 2) - cursor.Position.X;
+            var dy = (window.RenderTarget.Height / 2) - cursor.Position.Y;
 
-                        }
-                    }*//*
+            var paddingA = _padding;
 
-                    #region Draw Changes
-                    *//*            var changeLog = cyFiLog[_currentTick].Levels[bot.CurrentLevel].ChangeLog;
+            dx = MathHelper.Clamp(dx, 500, _padding / 2);
+            dy = MathHelper.Clamp(dy, 500, _padding / 2);
 
-                                changeLog.ForEach(t =>
-                                {
-                                    //Point position = level[t.pointX, t.pointY];
-                                    cyFiLog[0].Levels[bot.CurrentLevel].map[t.pointX][t.pointY] = t.tileType;
+            var mapSizeY = 4160;
+            var mapSizeX = 4060;
 
-                                    // DrawTile(position, bot.CurrentLevel, t.tileType);
-                                });*//*
-                    #endregion
+            dx = MathHelper.Clamp(dx, -mapSizeX + window.RenderTarget.Width + (-paddingA / 2), -paddingA / 2);
+            dy = MathHelper.Clamp(dy, -mapSizeY + window.RenderTarget.Height + (paddingA / 2), (paddingA) / 2);
 
-                    #region Draw Bots
-                    *//*            for (int i = 0; i < cyFiLog[_currentTick].Bots.Count; i++)
-                                {
-                                    var otherBot = cyFiLog[_currentTick].Bots[i];
-                                    if (otherBot.CurrentLevel == bot.CurrentLevel)
-                                    {
-                                        Point positionBot = level[otherBot.Hero.XPosition, otherBot.Hero.YPosition];
-                                        Rectangle playerRect = playerRectangle(positionBot.X, positionBot.Y);
-                                        bool isLadder = cyFiLog[0].Levels[otherBot.CurrentLevel].map[otherBot.Hero.XPosition][otherBot.Hero.YPosition] == 5 ||
-                                            cyFiLog[0].Levels[otherBot.CurrentLevel].map[otherBot.Hero.XPosition][otherBot.Hero.YPosition + 1] == 5 ||
-                                            cyFiLog[0].Levels[otherBot.CurrentLevel].map[otherBot.Hero.XPosition + 1][otherBot.Hero.YPosition] == 5 ||
-                                            cyFiLog[0].Levels[otherBot.CurrentLevel].map[otherBot.Hero.XPosition + 1][otherBot.Hero.YPosition + 1] == 5;
-                                        bool isDigging = cyFiLog[0].Levels[otherBot.CurrentLevel].map[otherBot.Hero.NextXPosition][otherBot.Hero.NextYPosition] == 1 ||
-                                                                cyFiLog[0].Levels[otherBot.CurrentLevel].map[otherBot.Hero.NextXPosition + 1][otherBot.Hero.NextYPosition + 1] == 1;
+            return Matrix.CreateTranslation(dx, dy, 0f);
+        }
 
-                                        //_spriteBatch.Draw(mockTexture, playerRect, GetBotColour(i));
-                                        bool flip = _currentTick > 0 && cyFiLog[_currentTick].Bots[i].Hero.XPosition < cyFiLog[_currentTick - 1].Bots[i].Hero.XPosition;
-
-                                        DrawBot(otherBot, playerRect, i, otherBot.NickName, isLadder, isDigging, flip, _currentTick);
-                                    }
-                                }*//*
-                    #endregion
-
-                    _spriteBatch.End();
-                    _graphicsDevice.SetRenderTarget(null);
-                }*/
         private void DrawTile(Point position, int tileType, Color color)
         {
             Texture2D texture = GetTileTexture(tileType);
@@ -455,6 +413,15 @@ namespace Visualiser
 
         }
 
+        private void DrawPowerUpTile(Point position, int powerUpType, Color color)
+        {
+            Texture2D texture = GetPowerUpTexture(powerUpType);
+            Rectangle rect = PowerUpRectangle(position);
+            _spriteBatch.Draw(texture, rect, color);
+        }
+
+        private void DrawCursor(Vector2 position) =>
+            _spriteBatch.Draw(EmptyTexture, position, Color.OrangeRed);
 
         private Texture2D GetTileTexture(int tileType)
         {
@@ -470,6 +437,23 @@ namespace Visualiser
                     return EmptyTexture;
                 default:
                     return EmptyTexture;
+            }
+        }
+
+        private Texture2D GetPowerUpTexture(int powerUpType)
+        {
+            switch (powerUpType)
+            {
+                case 1:
+                    return this.TerritoryImmunityTexture;
+                case 2:
+                    return this.UnprunableTexture;
+                case 3:
+                    return this.FreezeTexture;
+                case 4:
+                    return this.TrailTexture;
+                default:
+                    return this.SuperFertizerTexture;
             }
         }
 
@@ -517,6 +501,7 @@ namespace Visualiser
             }
 
         }
+
         private Color GetColor(int tileType)
         {
             /*  
@@ -555,29 +540,6 @@ namespace Visualiser
             }
         }
 
-        /*       private void InitialiseBotWindows()
-               {
-                   var windowWidth = _graphics.PreferredBackBufferWidth / 2;
-                   var windowHeight = _graphics.PreferredBackBufferHeight / 2;
-                   Point windowDimensions = new(windowWidth - 1, windowHeight - 1);
-
-                   if (GameState != null && GameState.Bots.Count > 0)
-                   {
-                       var bots = GameState.Bots.Keys.ToList();
-
-                       Dictionary<Guid, Rectangle> availableWindowBounds = new()
-                       {
-                           { bots[0], new Rectangle(new(0, 0), windowDimensions)},
-                           //   { bots[1], new Rectangle(new(windowWidth + 2, 0), windowDimensions)},
-                           //   { bots[2], new Rectangle(new(0, windowHeight + 2), windowDimensions) },
-                           //   { bots[3], new Rectangle(new(windowWidth + 2, windowHeight + 2), windowDimensions)}
-
-                       };
-
-                       _windows = availableWindowBounds.Select(i => GetWindow(i.Value, i.Key)).ToArray();
-                   }
-               }*/
-
         private CameraWindow GetWindow(Rectangle bounds, Guid index)
         {
             return new(index, bounds, _graphics);
@@ -609,6 +571,16 @@ namespace Visualiser
             public int Columns { get; }
             public int CurrentLevel { get; private set; }
             private readonly int _padding;
+            public int MapPxHight
+            {
+                get { return Rows * _padding; }
+                private set { }
+            }
+            public int MapPxWidth
+            {
+                get { return Columns * _padding; }
+                private set { }
+            }
 
             public Point[,] Maps { get; private set; }
 
@@ -629,17 +601,10 @@ namespace Visualiser
                 {
                     paddingY = _padding * -Columns;
 
-                    if (r == Rows - 1)
-                    {
-                        // MaxHeight = (paddingY + 1) * -1;
-                    }
-
                     for (int c = 0; c < Columns; c++)
                     {
                         Maps[r, c] = new Point(r + paddingX, (Columns - 1 - c) - paddingY);
                         paddingY += _padding;
-
-                        //   if (c == Columns - 1) MaxWidth = paddingX + 1;
 
                     }
                     paddingX += _padding;
@@ -654,13 +619,31 @@ namespace Visualiser
                 {
                     for (int c = 0; c < Columns; c++)
                     {
-                        Maps[r, c] = new Point(r + paddingX, c + paddingY);
+                        Maps[r, c] = new Point(paddingX, paddingY);
                         paddingY += _padding;
                     }
                     paddingX += _padding;
                     paddingY = 0;
                 }
             }
+        }
+
+        //TODO: move to Utils
+        public void CalculateCursorTranslation()
+        {
+            var widthval1 = Math.Max(_graphics.PreferredBackBufferWidth, levelLoader.MapPxWidth);
+            var widthval2 = Math.Min(_graphics.PreferredBackBufferWidth, levelLoader.MapPxWidth);
+
+            var dx = (_graphics.PreferredBackBufferWidth / 2) - _cursor.X;
+            dx = MathHelper.Clamp(dx, -widthval1 + widthval2 + (EmptyTexture.Width / 2) - 10, EmptyTexture.Width);
+
+            var heighthval1 = Math.Max(_graphics.PreferredBackBufferWidth, levelLoader.MapPxWidth);
+            var heightval2 = Math.Min(_graphics.PreferredBackBufferWidth, levelLoader.MapPxWidth);
+
+            var dy = (_graphics.PreferredBackBufferHeight / 2) - _cursor.Y;
+            dy = MathHelper.Clamp(dy, -heighthval1 + heightval2 + (EmptyTexture.Height / 2) - 10, EmptyTexture.Height);
+
+            _cursorTranslation = Matrix.CreateTranslation(dx, dy, 0f);
         }
 
     }

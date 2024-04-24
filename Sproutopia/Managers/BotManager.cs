@@ -88,6 +88,16 @@ namespace Sproutopia.Managers
                 });
         }
 
+        public void AwardTBP(Guid botId, int areaClaimed)
+        {
+            if (!_bots.ContainsKey(botId))
+            {
+                throw new ArgumentException("Unknown bot", nameof(botId));
+            }
+
+            _bots[botId].TieBreakingPoints += (int)Math.Pow(areaClaimed / 10.0, 2.0);
+        }
+
         public void RespawnBot(Guid botId)
         {
             if (!_bots.ContainsKey(botId))
@@ -117,6 +127,11 @@ namespace Sproutopia.Managers
         public void ClearQueue(Guid botId)
         {
             _bots[botId].ClearQueue();
+        }
+
+        public Dictionary<int, Guid> BotIds()
+        {
+            return _bots.Select((pair, index) => new { Index = index, Key = pair.Key }).ToDictionary(x => x.Index, x => x.Key);
         }
 
         public IEnumerable<CellCoordinate> ViewBots()

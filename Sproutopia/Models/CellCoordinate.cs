@@ -19,6 +19,12 @@ namespace Sproutopia.Models
             Y = (int)point.Y;
         }
 
+        public CellCoordinate(Coordinate coord)
+        {
+            X = (int)coord.X;
+            Y = (int)coord.Y;
+        }
+
         protected override IEnumerable<object> GetAtomicValues()
         {
             yield return X;

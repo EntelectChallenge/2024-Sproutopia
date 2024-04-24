@@ -19,7 +19,7 @@ namespace Sproutopia.Models
         private int _powerUpCountdown { get; set; } = 0;
         private SuperPowerUpType? _superPowerUpActive { get; set; } = null;
         private int _superPowerUpCountdown { get; set; } = 0;
-        public int TieBreakingPoints { get; set; } // TODO: Still uncertain how this will be calculate and when and by whom it will be set
+        public int TieBreakingPoints { get; set; } = 0;
 
         public BotState(Guid botId, string nickname, string connectionId, CellCoordinate position)
         {
@@ -129,7 +129,7 @@ namespace Sproutopia.Models
         /// <returns>Boolean value determining whether the command was enqueued successfully</returns>
         public Task<bool> EnqueueCommand(SproutBotCommand command)
         {
-            switch (LastCommand.Action)
+            switch (Momentum)
             {
                 case BotAction.Up: if (command.Action == BotAction.Down) return Task.FromResult(false); break;
                 case BotAction.Down: if (command.Action == BotAction.Up) return Task.FromResult(false); break;

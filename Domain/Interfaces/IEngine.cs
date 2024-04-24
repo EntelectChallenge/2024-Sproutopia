@@ -36,6 +36,12 @@ namespace Domain.Interfaces
         Task AddCommandToBotQueue(BotCommand botCommand);
 
         /// <summary>
+        /// Returns static game information on request
+        /// </summary>
+        /// <param name="botId">Id of requesting bot</param>
+        Task RequestGameInfo(Guid botId);
+
+        /// <summary>
         /// Sets up hub connection and begins timer 
         /// </summary>
         Task StartGame();

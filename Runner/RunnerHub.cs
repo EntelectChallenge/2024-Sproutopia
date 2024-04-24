@@ -129,9 +129,15 @@ namespace Sproutopia
         {
             if (_engine.IsBotRegistered(command.BotId))
             {
-                Log.Information($"{command.BotId.ToString().Take(4)}: RECIEVED player command {(BotAction)command.Action}");
+                Log.Information($"{command.BotId.ToString().Take(4)}: RECEIVED player command {(BotAction)command.Action}");
                 await _engine.AddCommandToBotQueue(command);
             }
+        }
+
+        public async Task GetGameInfo(Guid botId)
+        {
+                Log.Information($"{botId.ToString().Take(4)}: RECEIVED game info request");
+                await _engine.RequestGameInfo(botId);
         }
         #endregion
 

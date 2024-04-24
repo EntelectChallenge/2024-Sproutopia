@@ -97,6 +97,28 @@ Improvements and enhancements will be made to the game engine code over time.
 
 The game engine is available to the community for peer review and bug fixes. If you find any bugs or have any concerns, please [e-mail us](mailto:challenge@entelect.co.za) or discuss it with us on the [forum](http://forum.entelect.co.za/). Alternatively submit a pull request on Github, and we will review it.
 
+## Logs
+
+When you run the Game Engine in debug configuration, it writes a log file for each game in the `./Sproutopia/bin/Debug/net8.0/logs` folder.
+
+When you run the Game Engine in Docker, using the `run.sh` or `run.cmd` scripts, it writes a log file for each game in the `./dockerlogs` folder.
+
+Each line entry in the log file is in `json` format but it is important to note that the overall log file will not be recognised as valid json by a json parser. This is because log entries are appended to the file in real time and so maintaining an overall valid json structure would not be feasible.
+
+There is a utility in the root of the project however which you can use to convert a log file to a valid json file. The utility is available as both a bash script (.sh) and a Windows command script (.cmd).
+
+To convert a log file to json, the utility can be used as follows:
+
+##### Windows Command Prompt / PowerShell:
+```powershell
+.\log2json.cmd inputfilename.log outputfilename.json
+```
+
+##### Linux / MacOS / Unix:
+```powershell
+./run.sh inputfilename.log outputfilename.json
+```
+
 ## Submission Process
 We have automated submissions through GitHub!
 For more information, sign up for the player portal [here](https://challenge.entelect.co.za/login), and follow the steps!

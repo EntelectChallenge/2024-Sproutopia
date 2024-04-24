@@ -33,6 +33,18 @@ namespace Sproutopia.Managers
         public void AddPowerUp();
 
         /// <summary>
+        /// Returns all powerups on the board by their position
+        /// </summary>
+        /// <returns>Dictionary<CellCoordinate, PowerUpType></returns>
+        public Dictionary<CellCoordinate, PowerUpType> GetPowerUpTypes();
+
+        /// <summary>
+        /// Returns all super powerups on the board by their position
+        /// </summary>
+        /// <returns>Dictionary<CellCoordinate, SuperPowerUpType></returns>
+        public Dictionary<CellCoordinate, SuperPowerUpType> GetSuperPowerUpTypes();
+
+        /// <summary>
         /// Removes a specified powerup or super powerup from the game world
         /// </summary>
         /// <typeparam name="T">Type of powerup (PowerUpType / SuperPowerUpType)</typeparam>
@@ -77,6 +89,20 @@ namespace Sproutopia.Managers
         /// </summary>
         /// <returns>IEnumerable<(Guid botId, int claimedPercentage)></returns>
         public IEnumerable<(Guid botId, int claimedPercentage)> Leaderboard();
+
+        /// <summary>
+        /// Returns a list of coordinates included in garden
+        /// </summary>
+        /// <param name="gardenId">Id of garden</param>
+        /// <returns>IEnumerable<CellCoordinate></returns>
+        public IEnumerable<CellCoordinate> GetGardenCellsById(Guid gardenId);
+
+        /// <summary>
+        /// Returns a list of coordinates included in trail
+        /// </summary>
+        /// <param name="gardenId">Id of trail</param>
+        /// <returns>IEnumerable<CellCoordinate></returns>
+        public IEnumerable<CellCoordinate> GetTrailCellsById(Guid gardenId);
 
         /// <summary>
         /// Serialise the map as a jagged byte array.

@@ -1,4 +1,5 @@
-﻿using Domain.Models;
+﻿using Domain;
+using Domain.Models;
 using Microsoft.Extensions.Options;
 using Runner.DTOs;
 using Sproutopia.Domain;
@@ -53,9 +54,11 @@ namespace Sproutopia.Models
             HeroWindowSize = _gameSettings.PlayerWindowSize;
         }
 
-        public void AddBot(Guid botId, string nickname, string connectionId)
+        public Guid AddBot(Guid botId, string nickname, string connectionId)
         {
             GardenManager.AddBot(botId, nickname, connectionId);
+
+            return botId;
         }
 
         public (List<Guid> pruned, List<Guid> interrupted) IssueCommand(SproutBotCommand command)
@@ -77,6 +80,11 @@ namespace Sproutopia.Models
             {
                 BotManager.SetSuperPowerUp(command.BotId, botResponse.SuperPowerUpExcavated.PowerUpType);
                 GardenManager.RemovePowerUp<SuperPowerUpType>(botResponse.SuperPowerUpExcavated.Id);
+            }
+
+            if (botResponse.AreaClaimed != 0)
+            {
+                BotManager.AwardTBP(command.BotId, botResponse.AreaClaimed);
             }
 
             return (botResponse.BotsPruned, botResponse.BotsInterrupted);
@@ -127,6 +135,58 @@ namespace Sproutopia.Models
             return true;
         }
 
+        public DiffLog MapToDiffLog(GameState previous)
+        {
+            var prevDiffLog = MapToDiffLog(new DiffLog());
+
+            return MapToDiffLog(prevDiffLog);
+        }
+
+        public DiffLog MapToDiffLog(DiffLog previous)
+        {
+            var botIds = BotManager.BotIds();
+            var botStates = BotManager.GetAllBotStates();
+
+            int currentTick = CurrentTick;
+            Dictionary<Guid, int> leaderBoard = GardenManager.Leaderboard().ToDictionary(tuple => tuple.botId, tuple => tuple.claimedPercentage);
+            Dictionary<Guid, CellCoordinate> botPositions = botStates.Values.ToDictionary(b => b.BotId, b => b.Position);
+            Dictionary<Guid, BotAction> botDirections = botStates.Values.ToDictionary(b => b.BotId, b => b.LastCommand.Action);
+            Dictionary<Guid, PowerUpType> botPowerUps = botStates
+                .Where(b => b.Value.GetActivePowerUp().HasValue)
+                .ToDictionary(b => b.Key, b => b.Value.GetActivePowerUp()!.Value);
+            Dictionary<Guid, SuperPowerUpType> botSuperPowerUps = botStates
+                .Where(b => b.Value.GetActiveSuperPowerUp().HasValue)
+                .ToDictionary(b => b.Key, b => b.Value.GetActiveSuperPowerUp()!.Value);
+            Dictionary<CellCoordinate, int> territory = [];
+            Dictionary<CellCoordinate, int> trails = [];
+            foreach (var bot in botIds)
+            {
+                GardenManager.GetGardenCellsById(bot.Value).ToList().ForEach(c => territory[c] = bot.Key);
+                GardenManager.GetTrailCellsById(bot.Value).ToList().ForEach(c => trails[c] = bot.Key);
+            }
+            Dictionary<CellCoordinate, bool> weeds = GardenManager.ViewWeeds()
+                .SelectMany((row, rowIndex) => row.Select((value, colIndex) => new { RowIndex = rowIndex, ColIndex = colIndex, Value = value }))
+                .Where(cell => cell.Value).ToDictionary(c => new CellCoordinate(c.ColIndex, c.RowIndex), c => true);
+            Dictionary<CellCoordinate, PowerUpType> powerUps = GardenManager.ViewPowerUps<PowerUpType>().ToDictionary(p => p.Coords, p => p.PowerupType);
+            Dictionary<CellCoordinate, SuperPowerUpType> superPowerUps = GardenManager.ViewPowerUps<SuperPowerUpType>().ToDictionary(p => p.Coords, p => p.PowerupType);
+
+            var current = new DiffLog(
+                currentTick: currentTick,
+                leaderBoard: leaderBoard,
+                botPositions: botPositions,
+                botDirections: botDirections,
+                botPowerUps: botPowerUps,
+                botSuperPowerUps: botSuperPowerUps,
+                territory: territory,
+                trails: trails,
+                weeds: weeds,
+                powerUps: powerUps,
+                superPowerUps: superPowerUps
+                );
+
+            return new DiffLog(previous, current);
+        }
+
         public GameStateDto MapAllToDto()
         {
             var heroWindow = GardenManager.ViewGardens().Select(rows =>
@@ -136,7 +196,23 @@ namespace Sproutopia.Models
             var weeds = GardenManager.ViewWeeds();
 
             return new(CurrentTick, heroWindow, MapAllBotsToDto(), powerUps, weeds);
+        }
 
+        public GameInfoDTO MapToGameInfoDto()
+        {
+            var bots = BotManager.BotIds();
+
+            var dto = new GameInfoDTO(
+                maxTicks: MaxTicks,
+                tickRate: TickRate,
+                rows: NumRows,
+                cols: NumCols,
+                randomSeed: Seed,
+                playerWindowSize: PlayerWindowSize,
+                bots: bots
+            );
+
+            return dto;
         }
 
         public Dictionary<Guid, BotStateDTO> MapAllBotsToDto() =>

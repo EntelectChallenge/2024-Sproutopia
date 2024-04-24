@@ -13,14 +13,14 @@ namespace Visualiser
         private int ID { get; }
         private float LayerDepth { get; set; }
         public bool Visible { get; set; }
-        public Vector2 Position { get; }
+        public Point Position { get; }
         public Texture2D Texture { get; private set; }
         private int CellWidth { get; set; }
         private int CellHeight { get; set; }
 
         public Button(Texture2D staticImage,
             Texture2D clickedImage,
-            Point dimensions, Vector2 position,
+            Point dimensions, Point position,
             string name,
             int id,
             bool visible,

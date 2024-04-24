@@ -82,13 +82,29 @@ namespace Sproutopia
             await _gameState.BotManager.EnqueueCommand(sproutBotCommand);
         }
 
-        public void RegisterBot(Guid token, string nickName, string connectionId) => _gameState.AddBot(token, nickName, connectionId);
+        public async Task RequestGameInfo(Guid botId)
+        {
+            var bot = _gameState.BotManager.GetBotState(botId);
+            if (bot != null)
+            {
+                var dto = _gameState.MapToGameInfoDto();
+                await _runnerContext.Clients.Client(bot.ConnectionId)
+                    .SendAsync(RunnerCommands.ReceiveGameInformation, dto);
+            }
+        }
+
+        public void RegisterBot(Guid token, string nickName, string connectionId)
+        {
+            var registeredBotId = _gameState.AddBot(token, nickName, connectionId);
+            _cloudIntegrationService.AddPlayer(0, registeredBotId.ToString(), 0, 0, registeredBotId.ToString());
+        }
 
 
         public async Task StartGame()
         {
             try
             {
+                await _runnerContext.Clients.All.SendAsync(RunnerCommands.ReceiveGameInformation, _gameState.MapToGameInfoDto());
                 _tickManager.StartTimer();
 #if DEBUG
                 await _visualiserContext.Clients.All.SendAsync(VisualiserCommands.ReceiveInitialGameState, _gameState.MapAllToDto());

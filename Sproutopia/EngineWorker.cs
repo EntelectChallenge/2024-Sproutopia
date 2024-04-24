@@ -6,7 +6,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Runner.Services;
 using Serilog;
-using Serilog.Sinks.File.GZip;
 using Sproutopia.Managers;
 using Sproutopia.Models;
 
@@ -46,17 +45,21 @@ namespace Sproutopia
             _randomizer = randomizer;
             _cloudIntegrationService = cloudIntegrationService;
 
+            var LOG_DIRECTORY = Environment.GetEnvironmentVariable("LOG_DIR") ?? Path.Combine(AppContext.BaseDirectory[..AppContext.BaseDirectory.IndexOf("Sproutopia")], "Logs");
+
+            var filename = DateTime.Now.ToString("yyMMddHHmmss");
+
             _endGameLogger = new LoggerConfiguration()
                 .Enrich.FromLogContext()
                 .Enrich.WithProperty("Application", "Sproutopia")
                 .MinimumLevel.Information()
-                .WriteTo.File("logs\\engGame.json")
+                .WriteTo.File(Path.Combine(LOG_DIRECTORY, $"{filename}endGame.json"), outputTemplate: "{Message:lj}{NewLine}")
                 .CreateLogger();
 
             _gameLogger = new LoggerConfiguration()
                 .Enrich.FromLogContext()
                 .MinimumLevel.Information()
-                .WriteTo.File("log.gz", hooks: new GZipHooks(), outputTemplate: "{Message}{NewLine}{Expression}")
+                .WriteTo.File(Path.Combine(LOG_DIRECTORY, $"{filename}.log"), outputTemplate: "{Message:lj}{NewLine}")
                 .CreateLogger();
         }
 
@@ -86,6 +89,8 @@ namespace Sproutopia
                 _gameSettings.PowerUpSpawnRateStdDev,
                 _gameSettings.PowerUpSpawnRateMin,
                 _gameSettings.PowerUpSpawnRateMax);
+
+            var prevGameState = new DiffLog();
 
             while (!stoppingToken.IsCancellationRequested)
             {
@@ -205,13 +210,20 @@ namespace Sproutopia
                         await _visualiserContext.Clients.All.SendAsync(VisualiserCommands.ReceiveInitialGameState,
                             _gameState.MapAllToDto());
 #endif
-                        foreach (var bot in _gameState.BotManager.GetAllBotStates())
-                        {
-                            await _runnerContext.Clients.Client(bot.Value.ConnectionId)
-                                .SendAsync(RunnerCommands.ReceiveBotState, _gameState.MapToBotDto(bot.Key));
 
-                            _gameLogger.Information("{@_gameState}", _gameState.MapAllToDto());
-                        }
+                        await Parallel.ForEachAsync(_gameState.BotManager.GetAllBotStates(),
+                            async (bot, cancellationToken) =>
+                            {
+                                await _runnerContext.Clients.Client(bot.Value.ConnectionId)
+                                    .SendAsync(RunnerCommands.ReceiveBotState, _gameState.MapToBotDto(bot.Key),
+                                        cancellationToken);
+                                _cloudIntegrationService.UpdatePlayer(bot.Key.ToString());
+                            });
+
+                        var diffLog = _gameState.MapToDiffLog(prevGameState);
+                        prevGameState = _gameState.MapToDiffLog(new DiffLog()); // last remembered state has to be absolute, not relative
+
+                        _gameLogger.Information("{@_gameState}", diffLog);
 
                         #endregion
                     }
@@ -232,11 +244,6 @@ namespace Sproutopia
         public async Task TriggerEndGame(CancellationToken stoppingToken)
         {
             Log.Information("Game Complete");
-
-            /*            Parallel.ForEach(_gameState.BotManager.GetAllBotStates(), bot =>
-                        {
-                            bot.TotalPoints += bot.Hero.Collected;
-                        });*/
 
             var leaderBoard = _gameState.GardenManager.Leaderboard().OrderByDescending(gs => gs.claimedPercentage);
             var bots = _gameState.BotManager.GetAllBotStates();

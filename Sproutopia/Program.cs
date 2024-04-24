@@ -42,6 +42,9 @@ namespace Sproutopia
                 .MinimumLevel.Debug()
                 .CreateLogger();
 
+            var LOG_DIRECTORY = Environment.GetEnvironmentVariable("LOG_DIR") ?? Path.Combine(AppContext.BaseDirectory[..AppContext.BaseDirectory.IndexOf("Sproutopia")], "Logs");
+            Environment.SetEnvironmentVariable("LOG_DIR", LOG_DIRECTORY);
+
             AppSettings appSettings = new();
             ILogger<CloudIntegrationService> cloudLog = new SerilogLoggerFactory(Log.Logger).CreateLogger<CloudIntegrationService>();
             CloudIntegrationService cloudIntegrationService = new(appSettings, cloudLog);
@@ -61,7 +64,7 @@ namespace Sproutopia
                         services.AddSingleton<GameState>();
                         services.AddSingleton<IBotManager, BotManager>();
                         services.AddSingleton<IGardenManager, GardenManager>();
-                        services.AddSingleton<RunnerHub>();
+                        services.AddTransient<RunnerHub>();
                         services.AddSignalR(options =>
                         {
                             //Uncomment for detailed error log for SignalR

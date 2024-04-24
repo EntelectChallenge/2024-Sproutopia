@@ -23,6 +23,8 @@ namespace Sproutopia.Managers
 
         public void SetSuperPowerUp(Guid botId, SuperPowerUpType? superPowerUpType);
 
+        public void AwardTBP(Guid botId, int areaClaimed);
+
         public void RespawnBot(Guid botId);
 
         public void AddBot(BotState botState);
@@ -30,6 +32,8 @@ namespace Sproutopia.Managers
         public Task<bool> EnqueueCommand(SproutBotCommand sproutBotCommand);
 
         public void ClearQueue(Guid botId);
+
+        public Dictionary<int, Guid> BotIds();
 
         /// <summary>
         /// Lists all bots on the map

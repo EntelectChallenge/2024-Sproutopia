@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.SignalR.Client;
 using Runner.DTOs;
 using Serilog;
 using Sproutopia;
+using Sproutopia.Models;
 
 DummyBot dummy = new DummyBot();
 dummy.Main();
@@ -45,6 +46,11 @@ namespace dummybot
                 Log.Information("Received:");
                 Log.Information("{@botState}", botState);
             });
+            connection.On<GameInfoDTO>(RunnerCommands.ReceiveGameInformation, gameInfo =>
+            {
+                Log.Information("Game Information:");
+                Log.Information("{@gameInfo}", gameInfo);
+            });
 
             connection.On<Guid>(RunnerCommands.EndGame, guid =>
             {
@@ -62,21 +68,24 @@ namespace dummybot
                 }
 
                 Console.WriteLine("Enter Command:");
-                var input = Console.ReadLine();
+                var input = Console.ReadKey();
 
-                switch (input.ToUpper())
+                switch (input.Key)
                 {
-                    case "W":
+                    case ConsoleKey.W:
                         SendCommand(BotAction.Up);
                         break;
-                    case "A":
+                    case ConsoleKey.A:
                         SendCommand(BotAction.Left);
                         break;
-                    case "S":
+                    case ConsoleKey.S:
                         SendCommand(BotAction.Down);
                         break;
-                    case "D":
+                    case ConsoleKey.D:
                         SendCommand(BotAction.Right);
+                        break;
+                    case ConsoleKey.Q:
+                        GetGameInfo();
                         break;
                     default:
                         Console.WriteLine("Please enter valid command : W/A/S/D");
@@ -94,6 +103,7 @@ namespace dummybot
         private void SendCommand(BotAction action) =>
             connection.SendAsync("SendPlayerCommand", new SproutBotCommand(botId, action));
 
-
+        private void GetGameInfo() =>
+            connection.SendAsync("GetGameInfo", botId);
     }
 }

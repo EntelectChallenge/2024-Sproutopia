@@ -149,4 +149,24 @@ public class MockGardenManager : IGardenManager
     {
         return "Mocked GardenManager";
     }
+
+    public Dictionary<CellCoordinate, PowerUpType> GetPowerUpTypes()
+    {
+        throw new NotImplementedException();
+    }
+
+    public Dictionary<CellCoordinate, SuperPowerUpType> GetSuperPowerUpTypes()
+    {
+        throw new NotImplementedException();
+    }
+
+    public IEnumerable<CellCoordinate> GetGardenCellsById(Guid gardenId)
+    {
+        throw new NotImplementedException();
+    }
+
+    public IEnumerable<CellCoordinate> GetTrailCellsById(Guid gardenId)
+    {
+        throw new NotImplementedException();
+    }
 }

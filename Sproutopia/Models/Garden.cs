@@ -92,6 +92,35 @@ namespace Sproutopia.Models
             Trail = null;
         }
 
+        public IEnumerable<CellCoordinate> ClaimedLandAsCellCoordinates()
+        {
+            var envelope = ClaimedLand.Envelope;
+            var minX = (int)envelope.Coordinates.ToList().MinBy(c => c.X)!.X;
+            var minY = (int)envelope.Coordinates.ToList().MinBy(c => c.Y)!.Y;
+            var maxX = (int)envelope.Coordinates.ToList().MaxBy(c => c.X)!.X;
+            var maxY = (int)envelope.Coordinates.ToList().MaxBy(c => c.Y)!.Y;
+
+            for (var y = minY; y <= maxY; y++)
+            {
+                for (var x = minX; x <= maxX; x++)
+                {
+                    if (IsCellInClaimedLand(new CellCoordinate(x, y)))
+                        yield return new CellCoordinate(x, y);
+                }
+            }
+        }
+
+        public IEnumerable<CellCoordinate> TrailAsCellCoordinates()
+        {
+            if (Trail != null)
+            {
+                foreach (var c in Trail.Coordinates)
+                {
+                    yield return new CellCoordinate(c);
+                }
+            }
+        }
+
         public override string ToString()
         {
             var envelope = ClaimedLand.Envelope;
