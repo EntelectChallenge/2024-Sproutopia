@@ -1,4 +1,4 @@
-﻿using Domain;
+﻿using Domain.Enums;
 using Domain.Models;
 using Sproutopia.Enums;
 using Sproutopia.Models;

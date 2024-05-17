@@ -1,6 +1,7 @@
-using Domain;
+using Domain.Enums;
 using Microsoft.Extensions.Options;
 using NetTopologySuite.Geometries;
+using Serilog;
 using Sproutopia.Domain;
 using Sproutopia.Enums;
 using Sproutopia.Models;
@@ -170,14 +171,14 @@ public class GardenManager : IGardenManager
 
     public void AddWeed(int growthRate)
     {
-        var newId = Guid.NewGuid();
-
         var strugglingBotId = Leaderboard().OrderBy(kv => kv.claimedPercentage).First().botId;
 
         var newPosition = FindNewWeedPosition(_botManager.GetBotState(strugglingBotId).Position);
 
         if (newPosition == null)
             return;
+
+        var newId = Guid.NewGuid();
 
         _weeds[newId] = new Weed(newId, newPosition, Helpers.RandomEnumValue<SuperPowerUpType>(_randomizer.random), growthRate);
 
@@ -208,6 +209,10 @@ public class GardenManager : IGardenManager
 
                 // weed can't grow over other weed or back into itself
                 if (_weeds.Values.Any(w => w.CoveredCells.Contains(testCell)))
+                    continue;
+
+                // weed can't grow over the spawn point of any bots
+                if (_startingPositions.Any(s => s.Equals(testCell)))
                     continue;
 
                 weed.CoveredCells.Add(testCell);
@@ -311,6 +316,10 @@ public class GardenManager : IGardenManager
                 if (!searchArea.Covers(testCell.ToCellInPointCoordinateSystem()))
                     continue;
 
+                // Exclude any cells occupied by bots
+                if (_botManager.GetAllBotStates().Values.Any(b => b.Position.Equals(testCell)))
+                    continue;
+
                 // Exclude any cells occupied by other powerups
                 if (_powerUps.Values.Any(p => p.Position == testCell))
                     continue;
@@ -319,6 +328,10 @@ public class GardenManager : IGardenManager
 
                 // Exclude any cells occupied by other weeds
                 if (_weeds.Values.Any(w => w.CoveredCells.Contains(testCell)))
+                    continue;
+
+                // Exclude any cells coinciding with spawn points of bots
+                if (_startingPositions.Any(s => s.Equals(testCell)))
                     continue;
 
                 candidates.Add(testCell);
@@ -372,7 +385,7 @@ public class GardenManager : IGardenManager
                 return new BotResponse
                 {
                     NewPosition = currentPosition,
-                    Momentum = BotAction.IDLE
+                    Momentum = bot.Momentum
                 };
             }
         }
@@ -482,17 +495,22 @@ public class GardenManager : IGardenManager
             {
                 // Severed trail belongs to self
 
-                // If bot is in IDLE state, it means it's either stuck against a wall or recently respawned
-                // without momentum. In either case, this does not constitute a collision with its own trail
+                // If bot is in IDLE state, it means it's recently respawned without momentum.
+                // This does not constitute a collision with its own trail
                 if (bot.Momentum != BotAction.IDLE)
                 {
                     // Check if bot has Trail Protection active
                     if (bot.IsActive(SuperPowerUpType.TrailProtection))
                     {
                         bot.ClearActiveSuperPowerUp();
+                        bot.ClearQueue();
+
+                        var startPoint = new CellCoordinate(botGarden.Trail!.StartPoint);
+                        trailGarden.ClearTrail();
+
                         return new BotResponse
                         {
-                            NewPosition = new CellCoordinate(botGarden.Trail!.StartPoint),
+                            NewPosition = startPoint,
                             Momentum = BotAction.IDLE,
                             Alive = true,
                             BotsPruned = prunedBots,
@@ -519,9 +537,17 @@ public class GardenManager : IGardenManager
 
         // Check if powerup is excavated
         powerUpExcavated = _powerUps.Values.FirstOrDefault(p => p.Position == newPosition);
+        if (powerUpExcavated != null)
+        {
+            Log.Debug($"Bot {bot.BotId} excavated {powerUpExcavated.PowerUpType}");
+        }
 
         // Check if super powerup is excavated
         superPowerUpExcavated = _superPowerUps.Values.FirstOrDefault(p => p.Position == newPosition);
+        if (superPowerUpExcavated != null)
+        {
+            Log.Debug($"Bot {bot.BotId} excavated {superPowerUpExcavated.PowerUpType}");
+        }
 
         // If Super Fertilizer is active, expand territory
         if (bot.IsActive(SuperPowerUpType.SuperFertilizer))
@@ -586,6 +612,8 @@ public class GardenManager : IGardenManager
                     weedsCleared.Add(weed.Id);
                     var newSuperPowerUp = new SuperPowerUp(weed.CorePowerUp, weed.StartingPosition);
                     _superPowerUps[newSuperPowerUp.Id] = newSuperPowerUp;
+
+                    Log.Debug($"{newSuperPowerUp.PowerUpType} uncovered at {weed.StartingPosition}");
                 }
                 foreach (var weedId in weedsCleared)
                 {
@@ -849,7 +877,7 @@ public class GardenManager : IGardenManager
         {
             // Union of start teritory, end territory and trail
             var trailGeo = garden.Trail.ToPointCoordinateSystem();
-            var newPoly = territoryStart!.Union(territoryEnd).Union(trailGeo) as Polygon;
+            var newPoly = (territoryStart ?? Polygon.Empty).Union(territoryEnd).Union(trailGeo) as Polygon;
             var exterior = new Polygon(new LinearRing(newPoly!.ExteriorRing.Coordinates));
             var oldClaimed = garden.ClaimedLand;
             garden.ClaimedLand = garden.ClaimedLand.Union(exterior);
@@ -867,6 +895,11 @@ public class GardenManager : IGardenManager
             newClaimed = exterior.Difference(newGeo);
 
             garden.ClaimedLand = garden.ClaimedLand.Union(exterior);
+
+            // Exclude starting territories of other bots from claimed land
+            garden.ClaimedLand = _gardens.Values
+                .Where(g => g.Id != garden.Id)
+                .Aggregate(garden.ClaimedLand, (claimedLand, botGarden) => claimedLand.Difference(botGarden.HomeBase));
 
             // Reset trail
             garden.ClearTrail();
@@ -891,7 +924,11 @@ public class GardenManager : IGardenManager
         if (!_gardens.TryGetValue(destinationBotId, out var gardenDst))
             throw new ArgumentException("Garden not found", nameof(destinationBotId));
 
-        gardenDst.ClaimedLand = gardenDst.ClaimedLand.Union(gardenSrc.ClaimedLand);
+        //Take the difference of claimed land and startingPosition in order to avoid taking the starting land
+        var landToClaim = gardenSrc.ClaimedLand.Difference(gardenSrc.HomeBase);
+
+        gardenDst.ClaimedLand = gardenDst.ClaimedLand.Union(landToClaim);
+
         gardenSrc.PruneClaimedLand();
 
         return true;

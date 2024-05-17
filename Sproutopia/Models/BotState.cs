@@ -1,4 +1,4 @@
-﻿using Domain;
+﻿using Domain.Enums;
 using Domain.Models;
 using Serilog;
 using Sproutopia.Enums;
@@ -123,20 +123,12 @@ namespace Sproutopia.Models
         }
 
         /// <summary>
-        /// Enqueues a new command onto the command queue if the command is valid
+        /// Enqueues a new command onto the command queue
         /// </summary>
         /// <param name="command">The command to be enqueued</param>
         /// <returns>Boolean value determining whether the command was enqueued successfully</returns>
         public Task<bool> EnqueueCommand(SproutBotCommand command)
         {
-            switch (Momentum)
-            {
-                case BotAction.Up: if (command.Action == BotAction.Down) return Task.FromResult(false); break;
-                case BotAction.Down: if (command.Action == BotAction.Up) return Task.FromResult(false); break;
-                case BotAction.Left: if (command.Action == BotAction.Right) return Task.FromResult(false); break;
-                case BotAction.Right: if (command.Action == BotAction.Left) return Task.FromResult(false); break;
-            }
-
             _commandQueue.Enqueue(command);
             LastCommand = command;
 

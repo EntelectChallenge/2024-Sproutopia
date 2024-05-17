@@ -76,6 +76,7 @@ namespace Sproutopia
                             //  options.
                         });//.AddMessagePack : used to compress JSON objects does not seem to be avaiable in version 8.0.0;
                         services.AddHostedService<EngineWorker>();
+                        
 #if DEBUG
                         services.AddSingleton<VisualiserHub>();
 #endif

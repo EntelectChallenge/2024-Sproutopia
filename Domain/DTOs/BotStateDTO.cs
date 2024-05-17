@@ -50,14 +50,20 @@
             Y = y;
         }
     }
-    public struct PowerUpLocation
+    public struct PowerUpLocation : ICloneable
     {
         public Location Location { get; set; }
         public int Type { get; set; }
+
         public PowerUpLocation(Location location, int type)
         {
             Location = location;
             Type = type;
+        }
+
+        public object Clone()
+        {
+            return new PowerUpLocation(Location, Type);
         }
     }
 

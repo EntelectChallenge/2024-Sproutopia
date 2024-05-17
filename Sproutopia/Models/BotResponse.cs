@@ -1,5 +1,4 @@
-﻿using Domain;
-using Sproutopia.Enums;
+﻿using Domain.Enums;
 
 namespace Sproutopia.Models
 {

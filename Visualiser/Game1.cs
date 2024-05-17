@@ -3,12 +3,17 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using Runner.DTOs;
 using Sproutopia;
 using Sproutopia.Models;
+using Sproutopia.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using Visualiser.Utils.Camera;
+using System.Threading;
+using Forms = System.Windows.Forms;
+
 
 namespace Visualiser
 {
@@ -26,9 +31,11 @@ namespace Visualiser
         private KeyboardState keyboardState;
         private readonly IConfiguration GameConfig;
         private IConfigurationBuilder GameConfigBuilder;
+        private bool _connectToEngine;
+
 
         private GameStateDto GameState { get; set; }
-        private GameState[] GameStateLogs { get; }
+        private List<GameStateDto> GameStateLogs { get; set; }
         private CameraWindow[] _windows;
         private int _heroToFollow;
 
@@ -72,7 +79,7 @@ namespace Visualiser
 
         #endregion
 
-        public Game1()
+        public Game1(bool connectToEngine)
         {
             _currentTick = 0;
             _initalPadding = 0;
@@ -80,7 +87,8 @@ namespace Visualiser
             _graphics = new(this);
             _cursor = new(_initalPadding, 0);
             Content.RootDirectory = "Content";
-            GameStateLogs = Array.Empty<GameState>();
+            GameStateLogs = [];
+            IsMouseVisible = true;
             _mouseLeftPressed = false;
             IsMouseVisible = true;
             GameConfig = new ConfigurationBuilder()
@@ -88,13 +96,63 @@ namespace Visualiser
                 .AddJsonFile($"appsettings.Development.json", optional: true, reloadOnChange: true)
                 .AddEnvironmentVariables()
                 .Build();
+            _connectToEngine = connectToEngine;
         }
 
         protected override void Initialize()
         {
             var GameSettings = GameConfig.GetSection("GameSettings");
             var VisualiserSettings = GameConfig.GetSection("VisualiserSettings");
+            var rows = GameSettings.GetValue<int>("Rows");
+            var cols = GameSettings.GetValue<int>("Cols");
 
+            if (!_connectToEngine)
+            {
+                var logFilePath = string.Empty;
+            
+                var thread = new Thread((ThreadStart)(() =>
+                {
+                    Forms.OpenFileDialog openFileDialog= new ();
+
+                    openFileDialog.Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*";
+                    openFileDialog.FilterIndex = 2;
+                    openFileDialog.RestoreDirectory = true;
+
+                    if (openFileDialog.ShowDialog() == Forms.DialogResult.OK)
+                    {
+                        logFilePath = openFileDialog.FileName;
+                    }
+                }));
+
+                thread.SetApartmentState(ApartmentState.STA);
+                thread.Start();
+                thread.Join();
+
+                var diffLogs = Helpers.LoadJson<DiffLog>(logFilePath, new[] { "\r\n", "\n", "\r" });
+                var newLand = Helpers.CreateJaggedArray<int[][]>(rows, cols);
+                Helpers.SetAllValues(newLand, 255);
+                var gameState = new GameStateDto(
+                    currentTick: 0,
+                    land: newLand,
+                    bots: new Dictionary<Guid, Runner.DTOs.BotStateDTO>(),
+                    powerUps: Array.Empty<PowerUpLocation>(),
+                    weeds: Helpers.CreateJaggedArray<bool[][]>(rows, cols)
+                    );
+
+                foreach (var diffLog in diffLogs)
+                {
+                    gameState = gameState.ApplyDiff(diffLog);
+                    GameStateLogs.Add(gameState);
+                }
+            }
+            
+            _oneShotMouseState = OneShotMouseButton.GetState();
+
+            //TODO: how to make this configurable
+            levelLoader = new(_padding, rows, cols);
+            levelLoader.AddLevel(_initalPadding);
+
+            Console.WriteLine("Initialized bot windows...");
             #region Screen Options
             //* set to screen size * //
             _graphics.PreferredBackBufferWidth = VisualiserSettings.GetValue<int>("WindowWidth");
@@ -116,21 +174,20 @@ namespace Visualiser
 
             _oneShotMouseState = OneShotMouseButton.GetState();
 
-            var rows = GameSettings.GetValue<int>("Rows");
-            var columns = GameSettings.GetValue<int>("Cols");
-
-            levelLoader = new(_padding, rows, columns);
+            levelLoader = new(_padding, rows, cols);
             levelLoader.AddLevel(_initalPadding);
 
             _botControllerPlacement = new(20, _graphics.PreferredBackBufferHeight - 300);
 
-            #region SignalR Configs
-            connection = new HubConnectionBuilder()
-                .WithUrl("http://localhost:5000/visualiserhub")
-                .WithAutomaticReconnect()
-                .Build();
-            #endregion
 
+            if (_connectToEngine)
+            {
+                connection = new HubConnectionBuilder()
+                    .WithUrl("http://localhost:5000/visualiserhub")
+                    .WithAutomaticReconnect()
+                    .Build(); 
+            }
+            
             base.Initialize();
         }
 
@@ -145,8 +202,6 @@ namespace Visualiser
             ClaimedLandTextures = Content.Load<Texture2D>("tiny_tile");
             TrailTexture = Content.Load<Texture2D>("tiny_tile");
             EmptyTexture = Content.Load<Texture2D>("tiny_tile");
-
-
 
             PlayerTextures = new List<Texture2D>() {
                 Content.Load<Texture2D>("tiny_tile"),
@@ -166,110 +221,127 @@ namespace Visualiser
 
             #region Load Buttons
 
-            _playToggleButton = new(
-                staticImage: Content.Load<Texture2D>("play"),
-                clickedImage: Content.Load<Texture2D>("play"),
-                dimensions: new(64, 64),
-                position: new(0, 0),
-                name: "play",
-                id: 33,
-                visible: true,
-                layerDepth: 1.0f);
+            if (_connectToEngine)
+            {
+                _playToggleButton = new(
+                    staticImage: Content.Load<Texture2D>("play"),
+                    clickedImage: Content.Load<Texture2D>("play"),
+                    dimensions: new(64, 64),
+                    position: new(0, 0),
+                    name: "play",
+                    id: 33,
+                    visible: true,
+                    layerDepth: 1.0f);
 
-            _pauseButton = new(
-                staticImage: Content.Load<Texture2D>("pause"),
-                clickedImage: Content.Load<Texture2D>("pause"),
-                dimensions: new(6, 68),
-                position: new(44, 0),
-                name: "pause",
-                id: 34,
-                visible: true,
-                layerDepth: 1.0f);
+                _pauseButton = new(
+                    staticImage: Content.Load<Texture2D>("pause"),
+                    clickedImage: Content.Load<Texture2D>("pause"),
+                    dimensions: new(6, 68),
+                    position: new(44, 0),
+                    name: "pause",
+                    id: 34,
+                    visible: true,
+                    layerDepth: 1.0f);
 
-            /*            _continueButton = new(
-                            staticImage: Content.Load<Texture2D>("ButtonStop"),
-                            clickedImage: Content.Load<Texture2D>("ButtonStop"),
-                            dimensions: new(131, 121),
-                            position: new(0, 261),
-                            name: "pause",
-                            id: 35,
-                            visible: true,
-                            layerDepth: 1.0f);*/
+                /*            _continueButton = new(
+                                staticImage: Content.Load<Texture2D>("ButtonStop"),
+                                clickedImage: Content.Load<Texture2D>("ButtonStop"),
+                                dimensions: new(131, 121),
+                                position: new(0, 261),
+                                name: "pause",
+                                id: 35,
+                                visible: true,
+                                layerDepth: 1.0f);*/
 
-            _stepButton = new(
-                staticImage: Content.Load<Texture2D>("step"),
-                clickedImage: Content.Load<Texture2D>("step"),
-                dimensions: new(64, 86),
-                position: new(90, 0),
-                name: "pause",
-                id: 35,
-                visible: true,
-                layerDepth: 1.0f);
+                _stepButton = new(
+                    staticImage: Content.Load<Texture2D>("step"),
+                    clickedImage: Content.Load<Texture2D>("step"),
+                    dimensions: new(64, 86),
+                    position: new(90, 0),
+                    name: "pause",
+                    id: 35,
+                    visible: true,
+                    layerDepth: 1.0f);
+            }
+
             #endregion
         }
 
         protected override void Update(GameTime gameTime)
         {
-            if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed || Keyboard.GetState().IsKeyDown(Keys.Escape))
-                Exit();
-
-            #region Keyboard Inputs 
-            keyboardState = Keyboard.GetState();
-
-            //Move map
-
-            var nextCursor = _cursor;
-
-            if (keyboardState.IsKeyDown(Keys.Up)) nextCursor.Y -= 1 * _speed;
-            if (keyboardState.IsKeyDown(Keys.Down)) nextCursor.Y += 1 * _speed;
-            if (keyboardState.IsKeyDown(Keys.Left)) nextCursor.X -= 1 * _speed;
-            if (keyboardState.IsKeyDown(Keys.Right)) nextCursor.X += 1 * _speed;
-
-            _cursor = Vector2.Clamp(nextCursor, new(_initalPadding, 0), new(_initalPadding + levelLoader.MapPxWidth - EmptyTexture.Width, levelLoader.MapPxHight - EmptyTexture.Height));
-            CalculateCursorTranslation();
-
-            #endregion
-
-            #region UI Inputs
-
-            HandelInput(gameTime);
-            _playToggleButton.UpdateButton();
-            _pauseButton.UpdateButton();
-            _stepButton.UpdateButton();
-
-            connection.On<GameStateDto>(VisualiserCommands.ReceiveInitialGameState, state =>
+            if (_connectToEngine)
             {
-                GameState = state;
-            });
-
-            if (_mouseLeftPressed)
-            {
-                _mouseLeftPressed = false;
-
-                try
+                if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed || Keyboard.GetState().IsKeyDown(Keys.Escape))
                 {
-                    if (connection.State == HubConnectionState.Connected)
-                    {
-                        if (CheckIfButtonWasClicked(_pauseButton))
-                            connection.SendAsync("PauseGame").Wait();
-
-                        if (CheckIfButtonWasClicked(_playToggleButton))
-                            connection.SendAsync("ContinueGame").Wait();
-
-                        if (CheckIfButtonWasClicked(_stepButton))
-                            connection.SendAsync("StepIntoGame").Wait();
-                    }
-                    else if (CheckIfButtonWasClicked(_playToggleButton)
-                        && connection.State != HubConnectionState.Reconnecting)
-                        connection.StartAsync().Wait();
+                    Exit();
                 }
-                catch (Exception ex)
+
+                #region Keyboard Inputs 
+                keyboardState = Keyboard.GetState();
+
+                //Move map
+
+                var nextCursor = _cursor;
+
+                if (keyboardState.IsKeyDown(Keys.Up)) nextCursor.Y -= 1 * _speed;
+                if (keyboardState.IsKeyDown(Keys.Down)) nextCursor.Y += 1 * _speed;
+                if (keyboardState.IsKeyDown(Keys.Left)) nextCursor.X -= 1 * _speed;
+                if (keyboardState.IsKeyDown(Keys.Right)) nextCursor.X += 1 * _speed;
+
+                _cursor = Vector2.Clamp(nextCursor, new(_initalPadding, 0), new(_initalPadding + levelLoader.MapPxWidth - EmptyTexture.Width, levelLoader.MapPxHight - EmptyTexture.Height));
+                CalculateCursorTranslation();
+
+                #endregion
+
+                #region UI Inputs
+
+                HandelInput(gameTime);
+                _playToggleButton.UpdateButton();
+                _pauseButton.UpdateButton();
+                _stepButton.UpdateButton();
+
+                connection.On<GameStateDto>(VisualiserCommands.ReceiveInitialGameState, state =>
                 {
-                    throw new Exception(ex.ToString());
+                    GameState = state;
+                });
+
+                if (_mouseLeftPressed)
+                {
+                    _mouseLeftPressed = false;
+
+                    try
+                    {
+                        if (connection.State == HubConnectionState.Connected)
+                        {
+                            if (CheckIfButtonWasClicked(_pauseButton))
+                                connection.SendAsync("PauseGame").Wait();
+
+                            if (CheckIfButtonWasClicked(_playToggleButton))
+                                connection.SendAsync("ContinueGame").Wait();
+
+                            if (CheckIfButtonWasClicked(_stepButton))
+                                connection.SendAsync("StepIntoGame").Wait();
+                        }
+                        else if (CheckIfButtonWasClicked(_playToggleButton)
+                            && connection.State != HubConnectionState.Reconnecting)
+                            connection.StartAsync().Wait();
+                    }
+                    catch (Exception ex)
+                    {
+                        throw new Exception(ex.ToString());
+                    }
+                }
+
+                #endregion
+            }
+            else
+            {
+                if (GameStateLogs.Count > 0 && _currentTick < GameStateLogs.Count)
+                {
+                    GameState = GameStateLogs[_currentTick];
+                    _currentTick += 1;
                 }
             }
-
-            #endregion
 
             base.Update(gameTime);
         }
@@ -280,7 +352,10 @@ namespace Visualiser
 
             if (GameState != null)
             {
-                _spriteBatch.Begin(transformMatrix: _cursorTranslation);
+                if (_connectToEngine)
+                    _spriteBatch.Begin(transformMatrix: _cursorTranslation);
+                else
+                    _spriteBatch.Begin();
 
                 #region Draw Game State Window 
                 for (int r = 0; r < levelLoader.Rows; r++)
@@ -333,18 +408,19 @@ namespace Visualiser
                 _spriteBatch.End();
             }
 
-            _spriteBatch.Begin();
+            if (_connectToEngine)
+            {
+                _spriteBatch.Begin();
 
-            #region Draw UI 
-            _spriteBatch.Draw(_playToggleButton.Texture, UIRectangle(_playToggleButton.Position, 40), Color.White);
-            _spriteBatch.Draw(_pauseButton.Texture, UIRectangle(_pauseButton.Position, 40), Color.White);
-            _spriteBatch.Draw(_stepButton.Texture, UIRectangle(_stepButton.Position, 40), Color.White);
-            //  _spriteBatch.Draw(_continueButton.Texture, _continueButton.Position, Color.White);
-            #endregion
+                #region Draw UI 
+                _spriteBatch.Draw(_playToggleButton.Texture, UIRectangle(_playToggleButton.Position, 40), Color.White);
+                _spriteBatch.Draw(_pauseButton.Texture, UIRectangle(_pauseButton.Position, 40), Color.White);
+                _spriteBatch.Draw(_stepButton.Texture, UIRectangle(_stepButton.Position, 40), Color.White);
+                //  _spriteBatch.Draw(_continueButton.Texture, _continueButton.Position, Color.White);
+                #endregion
 
-            _spriteBatch.End();
-
-
+                _spriteBatch.End();
+            }
 
             base.Draw(gameTime);
         }
@@ -647,4 +723,5 @@ namespace Visualiser
         }
 
     }
+    
 }

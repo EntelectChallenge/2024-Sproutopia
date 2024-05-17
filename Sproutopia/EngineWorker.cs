@@ -8,6 +8,8 @@ using Runner.Services;
 using Serilog;
 using Sproutopia.Managers;
 using Sproutopia.Models;
+using Sproutopia.Utilities;
+using System.Text.Json;
 
 namespace Sproutopia
 {
@@ -32,8 +34,7 @@ namespace Sproutopia
             IHubContext<VisualiserHub> visualiserContext,
             ICloudIntegrationService cloudIntegrationService,
             GlobalSeededRandomizer randomizer,
-            IHubContext<RunnerHub> runnerContext
-        )
+            IHubContext<RunnerHub> runnerContext)
         {
             _gameState = gameState;
             _gameSettings = settings.Value;
@@ -73,6 +74,13 @@ namespace Sproutopia
             {
                 Log.Error($"Game failed with exception: {e.Message}");
                 await HandleCriticalException(e);
+            }
+            finally
+            {
+                if (!stoppingToken.IsCancellationRequested)
+                {
+                    _gameLogger.Error("Worker stopped unexpectedly");
+                }
             }
         }
 
@@ -140,9 +148,12 @@ namespace Sproutopia
                             if (respawnList.Contains(command.BotId) || interruptedList.Contains(command.BotId))
                                 continue;
 
-                            // Checking if direction is valid is strictly no longer necessary because this check is performed when a command is enqueued
-                            // But I'm leaving this comment here to remind myself that this is the point where this check would have to be performed if
-                            // we decide to change this later.
+                            // Previously, the check for a valid command was performed when a command is enqueued but that is incorrect as commands can be
+                            // queued up faster than they are dequeued (which is kinda the point of a queue). To check the validity of a future command
+                            // against the current bot state would be wrong so the logic has been moved here.
+                            var momentum = _gameState.BotManager.GetBotState(command.BotId).Momentum;
+                            if (command.Action == ExtensionMethods.Reverse(momentum))
+                                continue;
 
                             var (pruned, interrupted) = _gameState.IssueCommand(command);
                             respawnList.AddRange(pruned.Except(respawnList));
@@ -183,7 +194,6 @@ namespace Sproutopia
                             }
                         }
 
-
                         // PowerUps
                         if (_tickManager.CurrentTick >= _gameSettings.PowerUpStartTick)
                         {
@@ -207,6 +217,9 @@ namespace Sproutopia
                         // Update GameState and BotState
                         _gameState.UpdateState(_tickManager.CurrentTick);
 #if DEBUG
+                        var currentPath = Directory.GetCurrentDirectory();
+                        var filePath = Path.Combine(currentPath, "SampleFullGameLogsOutput.json");
+                        Helpers.WriteJsonToFile(filePath, JsonSerializer.Serialize(_gameState.MapAllToDto()));
                         await _visualiserContext.Clients.All.SendAsync(VisualiserCommands.ReceiveInitialGameState,
                             _gameState.MapAllToDto());
 #endif
@@ -223,7 +236,7 @@ namespace Sproutopia
                         var diffLog = _gameState.MapToDiffLog(prevGameState);
                         prevGameState = _gameState.MapToDiffLog(new DiffLog()); // last remembered state has to be absolute, not relative
 
-                        _gameLogger.Information("{@_gameState}", diffLog);
+                        _gameLogger.Information("{@_gameState}", Newtonsoft.Json.JsonConvert.SerializeObject(diffLog)); // System.Text.Json does not render this object correctly, hence Newtonsoft
 
                         #endregion
                     }

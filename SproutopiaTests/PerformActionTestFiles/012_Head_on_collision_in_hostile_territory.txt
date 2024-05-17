@@ -15,7 +15,7 @@ Actions: AE,AE,AE,AE,AS
 
 Expected:
 .BBB.....
-.BBB.BBB.
+.B.B.BBB.
 .BBB.BBB.
 .....BBB.
 .........

@@ -1,12 +1,20 @@
-﻿using Domain;
+﻿using Domain.Enums;
 using NetTopologySuite.Geometries;
+using Newtonsoft.Json;
 using Sproutopia.Utilities;
+
 namespace Sproutopia.Models
 {
+    [JsonConverter(typeof(CellCoordinateConverter))]
     public class CellCoordinate : ValueObject
     {
         public int X { get; init; }
         public int Y { get; init; }
+
+        public CellCoordinate()
+        {
+        }
+
         public CellCoordinate(int x, int y)
         {
             X = x;
@@ -72,6 +80,17 @@ namespace Sproutopia.Models
         public override string ToString()
         {
             return $"{X},{Y}";
+        }
+
+        public static implicit operator CellCoordinate(string str)
+        {
+            string[] parts = str.Split(',');
+            if (parts.Length != 2 || !int.TryParse(parts[0], out int x) || !int.TryParse(parts[1], out int y))
+            {
+                throw new ArgumentException("Invalid string format for CellCoordinate conversion.");
+            }
+
+            return new CellCoordinate(x, y);
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿using Domain;
+﻿using Domain.Enums;
 using Sproutopia.Domain;
 using Sproutopia.Enums;
 using Sproutopia.Managers;

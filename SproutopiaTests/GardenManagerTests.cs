@@ -1,6 +1,5 @@
-using Domain;
+using Domain.Enums;
 using Domain.Models;
-using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.Extensions.Options;
 using NetTopologySuite.Geometries;
 using Sproutopia.Domain;
@@ -8,7 +7,6 @@ using Sproutopia.Enums;
 using Sproutopia.Managers;
 using Sproutopia.Models;
 using Sproutopia.Utilities;
-using System.Collections.Generic;
 using System.Text;
 
 namespace SproutopiaTests;
@@ -123,9 +121,9 @@ public class GardenManagerTests
     }
 
     [Test]
-    [TestCase(null, null, null, null, null, "0000000000000000111100000000011110000000000010000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", TestName = "ViewWeeds()")]
-    [TestCase(5, 3, 5, null, null, "1111011110001000010000000", TestName = "ViewWeeds(5, 3, 5)")]
-    [TestCase(5, 3, null, 7, 3, "011110000010000001000", TestName = "ViewWeeds(5, 3, 7, 3)")]
+    [TestCase(null, null, null, null, null, "0000000000000000011111000000001110000000000010000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", TestName = "ViewWeeds()")]
+    [TestCase(5, 3, 5, null, null, "0111101110001000010000000", TestName = "ViewWeeds(5, 3, 5)")]
+    [TestCase(5, 3, null, 7, 3, "001110000010000001000", TestName = "ViewWeeds(5, 3, 7, 3)")]
     public void Test_ViewWeeds(int? x, int? y, int? size, int? width, int? height, string expected)
     {
         // Arrange
@@ -378,6 +376,8 @@ public class GardenManagerTests
         var gardenManager = new GardenManager(9, 9, _botManager, _randomizer);
         var gardenSrc = gardenManager.InitialiseGarden(new("23d7b429-4abf-4bb4-8a78-0ee0b55f74c0"), 1, 1, 3);
         var gardenDst = gardenManager.InitialiseGarden(new("7542d58c-a331-4ac3-8947-e5b93780e7f1"), 1, 7, 3);
+        gardenSrc.HomeBase = new Polygon(null);
+        gardenDst.HomeBase = new Polygon(null);
 
         Geometry geometrySrc = new Polygon(null);
         Geometry geometryDst = new Polygon(null);

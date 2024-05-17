@@ -1,4 +1,4 @@
-using Domain;
+using Domain.Enums;
 using Domain.Models;
 using Microsoft.Extensions.Options;
 using NUnit.Framework.Internal;
@@ -6,7 +6,6 @@ using Sproutopia.Enums;
 using Sproutopia.Managers;
 using Sproutopia.Models;
 using SproutopiaTests.Mocks;
-using System.Text;
 
 namespace SproutopiaTests;
 

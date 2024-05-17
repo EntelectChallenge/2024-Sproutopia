@@ -17,9 +17,9 @@ Expected:
 .........
 .AAA.AAA.
 .AAAAAAA.
-.AAAAAAA.
+.AAAA.AA.
 ..AAAAA..
-.AAAAAAA.
+.AA.A.AA.
 .AAAAAAA.
 .AAA.AAA.
 .........

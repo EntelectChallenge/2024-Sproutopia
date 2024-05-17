@@ -1,5 +1,4 @@
-﻿using Domain;
-using Runner.DTOs;
+﻿using Domain.Enums;
 using Sproutopia.Domain;
 using Sproutopia.Enums;
 
@@ -68,15 +67,15 @@ namespace Sproutopia.Models
                 GetChanges(before.BotDirections, after.BotDirections),
                 GetChanges(before.BotPowerUps, after.BotPowerUps),
                 GetChanges(before.BotSuperPowerUps, after.BotSuperPowerUps),
-                GetChanges(before.Territory, after.Territory),
-                GetChanges(before.Trails, after.Trails),
+                GetChanges(before.Territory, after.Territory, (int)CellType.Unclaimed),
+                GetChanges(before.Trails, after.Trails, (int)CellType.Unclaimed),
                 GetChanges(before.Weeds, after.Weeds),
                 GetChanges(before.PowerUps, after.PowerUps),
                 GetChanges(before.SuperPowerUps, after.SuperPowerUps))
         {
         }
 
-        public static Dictionary<TKey, TValue> GetChanges<TKey, TValue>(Dictionary<TKey, TValue> original, Dictionary<TKey, TValue> updated) where TKey : notnull
+        public static Dictionary<TKey, TValue> GetChanges<TKey, TValue>(Dictionary<TKey, TValue> original, Dictionary<TKey, TValue> updated, TValue? removalValue = default(TValue)) where TKey : notnull
         {
             var changes = new Dictionary<TKey, TValue>();
 
@@ -95,7 +94,7 @@ namespace Sproutopia.Models
                 else
                 {
                     // If the key does not exist in the updated dictionary, consider it as a removal
-                    changes[key] = default(TValue);
+                    changes[key] = removalValue;
                 }
             }
 

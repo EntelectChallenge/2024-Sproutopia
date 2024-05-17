@@ -1,4 +1,6 @@
-﻿namespace Domain.Models
+﻿using Domain.Enums;
+
+namespace Domain.Models
 {
     public class SproutBotCommand : BotCommand, IComparable<SproutBotCommand>
     {

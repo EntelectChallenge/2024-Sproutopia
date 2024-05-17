@@ -1,6 +1,7 @@
-﻿using NetTopologySuite.Geometries;
-using Sproutopia.Domain;
+﻿using Domain.Enums;
+using NetTopologySuite.Geometries;
 using Sproutopia.Models;
+using System.Text;
 
 namespace Sproutopia.Utilities
 {
@@ -147,6 +148,51 @@ namespace Sproutopia.Utilities
                 (list[n], list[k]) = (list[k], list[n]);
             }
             return list;
+        }
+
+        public static BotAction Reverse(this BotAction action)
+        {
+            return action switch
+            {
+                BotAction.Left => BotAction.Right,
+                BotAction.Right => BotAction.Left,
+                BotAction.Up => BotAction.Down,
+                BotAction.Down => BotAction.Up,
+                _ => BotAction.IDLE,
+            };
+        }
+
+        public static string StringMap(this int[][] map)
+        {
+            var width = map.Length;
+            var height = map[0].Length;
+
+            StringBuilder sb = new StringBuilder();
+
+            for (var y = 0; y < height; y++)
+            {
+                if (y != 0)
+                    sb.AppendLine();
+
+                for (var x = 0; x < width; x++)
+                {
+                    sb.Append(map[x][y] switch
+                    {
+                        0 => "A",
+                        1 => "B",
+                        2 => "C",
+                        3 => "D",
+                        4 => "a",
+                        5 => "b",
+                        6 => "c",
+                        7 => "d",
+                        254 => "#",
+                        _ => ".",
+                    });
+                }
+            }
+
+            return sb.ToString();
         }
     }
 }

@@ -10,6 +10,7 @@ namespace Sproutopia.Models
     {
         public Guid Id { get; private set; }
         public Geometry ClaimedLand;
+        public Geometry HomeBase;
         public LineString? Trail;
 
         public int TrailLength => Trail != null ? (int)Trail.Length : 0;
@@ -22,6 +23,7 @@ namespace Sproutopia.Models
         {
             this.Id = Id;
             ClaimedLand = claimedLand;
+            HomeBase = ClaimedLand;
             Trail = null;
         }
 
@@ -95,17 +97,21 @@ namespace Sproutopia.Models
         public IEnumerable<CellCoordinate> ClaimedLandAsCellCoordinates()
         {
             var envelope = ClaimedLand.Envelope;
-            var minX = (int)envelope.Coordinates.ToList().MinBy(c => c.X)!.X;
-            var minY = (int)envelope.Coordinates.ToList().MinBy(c => c.Y)!.Y;
-            var maxX = (int)envelope.Coordinates.ToList().MaxBy(c => c.X)!.X;
-            var maxY = (int)envelope.Coordinates.ToList().MaxBy(c => c.Y)!.Y;
 
-            for (var y = minY; y <= maxY; y++)
+            if (!envelope.IsEmpty)
             {
-                for (var x = minX; x <= maxX; x++)
+                var minX = (int)envelope.Coordinates.ToList().MinBy(c => c.X)!.X;
+                var minY = (int)envelope.Coordinates.ToList().MinBy(c => c.Y)!.Y;
+                var maxX = (int)envelope.Coordinates.ToList().MaxBy(c => c.X)!.X;
+                var maxY = (int)envelope.Coordinates.ToList().MaxBy(c => c.Y)!.Y;
+
+                for (var y = minY; y <= maxY; y++)
                 {
-                    if (IsCellInClaimedLand(new CellCoordinate(x, y)))
-                        yield return new CellCoordinate(x, y);
+                    for (var x = minX; x <= maxX; x++)
+                    {
+                        if (IsCellInClaimedLand(new CellCoordinate(x, y)))
+                            yield return new CellCoordinate(x, y);
+                    }
                 }
             }
         }
