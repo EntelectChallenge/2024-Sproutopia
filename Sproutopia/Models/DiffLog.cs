@@ -1,4 +1,5 @@
 ﻿using Domain.Enums;
+using Domain.Models;
 using Sproutopia.Domain;
 using Sproutopia.Enums;
 
@@ -7,6 +8,7 @@ namespace Sproutopia.Models
     public class DiffLog
     {
         public int CurrentTick { get; set; }
+        public List<BotSnapshot> BotSnapshots { get; set; }
         public Dictionary<Guid, int> LeaderBoard { get; set; }
         public Dictionary<Guid, CellCoordinate> BotPositions { get; set; }
         public Dictionary<Guid, BotAction> BotDirections { get; set; }
@@ -22,6 +24,7 @@ namespace Sproutopia.Models
         public DiffLog()
         {
             CurrentTick = 0;
+            BotSnapshots = [];
             LeaderBoard = [];
             BotPositions = [];
             BotDirections = [];
@@ -36,6 +39,7 @@ namespace Sproutopia.Models
 
         public DiffLog(
             int currentTick,
+            List<BotSnapshot> botSnapshots,
             Dictionary<Guid, int> leaderBoard,
             Dictionary<Guid, CellCoordinate> botPositions,
             Dictionary<Guid, BotAction> botDirections,
@@ -48,6 +52,7 @@ namespace Sproutopia.Models
             Dictionary<CellCoordinate, SuperPowerUpType> superPowerUps)
         {
             CurrentTick = currentTick;
+            BotSnapshots = botSnapshots;
             LeaderBoard = leaderBoard;
             BotPositions = botPositions;
             BotDirections = botDirections;
@@ -62,6 +67,7 @@ namespace Sproutopia.Models
 
         public DiffLog(DiffLog before, DiffLog after) : this(
                 after.CurrentTick,
+                after.BotSnapshots,
                 GetChanges(before.LeaderBoard, after.LeaderBoard),
                 GetChanges(before.BotPositions, after.BotPositions),
                 GetChanges(before.BotDirections, after.BotDirections),

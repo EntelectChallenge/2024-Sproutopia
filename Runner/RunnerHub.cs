@@ -1,5 +1,4 @@
-﻿using Domain;
-using Domain.Enums;
+﻿using Domain.Enums;
 using Domain.Exceptions;
 using Domain.Interfaces;
 using Domain.Models;
@@ -14,7 +13,6 @@ namespace Sproutopia
     {
         private readonly IEngine _engine;
         private readonly ICloudIntegrationService _cloudIntegrationService;
-
         public RunnerHub(IEngine engine,
           ICloudIntegrationService cloudIntegrationService)
         {
@@ -127,17 +125,17 @@ namespace Sproutopia
         /// <returns></returns>
         public async Task SendPlayerCommand(BotCommand command)
         {
-            if (_engine.IsBotRegistered(command.BotId))
+            if (_engine.IsBotAuthorized(command.BotId, Context.ConnectionId))
             {
-                Log.Information($"{command.BotId.ToString().Take(4)}: RECEIVED player command {(BotAction)command.Action}");
+                Log.Information($"{command.BotId}: RECEIVED player command {(BotAction)command.Action}");
                 await _engine.AddCommandToBotQueue(command);
             }
         }
 
         public async Task GetGameInfo(Guid botId)
         {
-                Log.Information($"{botId.ToString().Take(4)}: RECEIVED game info request");
-                await _engine.RequestGameInfo(botId);
+            Log.Information($"{botId}: RECEIVED game info request");
+            await _engine.RequestGameInfo(botId);
         }
         #endregion
 
@@ -150,7 +148,6 @@ namespace Sproutopia
                 Log.Information("Game Starting!");
 
                 await _cloudIntegrationService.Announce(CloudCallbackType.Started);
-
                 await _engine.StartGame();
             }
             else

@@ -11,6 +11,8 @@ namespace Sproutopia.Managers
 
         public bool IsBotRegistered(Guid botId);
 
+        public bool IsBotConnectionValid(Guid botId, string connectionId);
+
         public Dictionary<Guid, BotState> GetAllBotStates();
 
         public BotState GetBotState(Guid botId);

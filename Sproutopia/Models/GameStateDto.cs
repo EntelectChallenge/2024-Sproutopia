@@ -1,12 +1,18 @@
-﻿using Runner.DTOs;
+﻿using Domain.Enums;
+using Domain.Models;
+using Newtonsoft.Json;
+using Runner.DTOs;
 using Sproutopia.Domain;
+using Sproutopia.Enums;
 using Sproutopia.Utilities;
+using System.Text;
 
 namespace Sproutopia.Models
 {
     public class GameStateDto
     {
         public int CurrentTick { get; set; }
+        public List<BotSnapshot> BotSnapshots { get; set; }
         public int[][] Land { get; set; }
         public Dictionary<Guid, BotStateDTO> Bots { get; set; }
         public Dictionary<CellType, CellCoordinate> ChangeLog { get; set; }
@@ -14,12 +20,14 @@ namespace Sproutopia.Models
         public bool[][] Weeds { get; set; }
 
         public GameStateDto(int currentTick,
+            List<BotSnapshot> botSnapshots,
             int[][] land,
             Dictionary<Guid, BotStateDTO> bots,
             PowerUpLocation[] powerUps,
             bool[][] weeds)
         {
             CurrentTick = currentTick;
+            BotSnapshots = botSnapshots;
             Land = land;
             Bots = bots;
             ChangeLog = [];
@@ -27,10 +35,42 @@ namespace Sproutopia.Models
             PowerUps = powerUps;
         }
 
+        public override string ToString()
+        {
+            StringBuilder sb = new StringBuilder();
+
+            sb.AppendLine($"Tick: {CurrentTick}");
+            sb.AppendLine();
+            foreach (var (id, botState) in Bots)
+            {
+                var botSnapshot = BotSnapshots.FirstOrDefault(b => b.BotId == id);
+                sb.AppendLine($"{id.ToString().Substring(0, 4)}...: {botState.X},{botState.Y}->{(BotAction)botState.DirectionState}({botSnapshot?.Action})");
+            }
+            sb.AppendLine();
+            sb.AppendLine("Power Ups:");
+            foreach (var (id, botState) in Bots)
+            {
+                sb.AppendLine($"{id.ToString().Substring(0, 4)}...: {(PowerUpType)botState.PowerUp}");
+            }
+            sb.AppendLine();
+            sb.AppendLine("Super Power Ups:");
+            foreach (var (id, botState) in Bots)
+            {
+                sb.AppendLine($"{id.ToString().Substring(0, 4)}...: {(SuperPowerUpType)botState.SuperPowerUp}");
+            }
+
+            return sb.ToString();
+        }
+
         public GameStateDto DeepCopy()
         {
+            // Using Json serialization/deserialization for deep copy as a quick and dirty alternative for the deep copy code I wrote below
+            // as that had some bugs which I'm too lazy to figure out now.
+            return JsonConvert.DeserializeObject<GameStateDto>(JsonConvert.SerializeObject(this));
+
             GameStateDto copy = new GameStateDto(
                 currentTick : CurrentTick,
+                botSnapshots : BotSnapshots, // I don't think a deep copy is necessary here as we're not doing a diff on this field but I'll have to confirm
                 land : Helpers.DeepCopy2DArray(Land),
                 bots : Helpers.DeepCopyDictionary(Bots),
                 powerUps : Helpers.DeepCopyArray(PowerUps),
@@ -58,6 +98,8 @@ namespace Sproutopia.Models
         {
             var newGameState = DeepCopy();
             newGameState.CurrentTick = diffLog.CurrentTick;
+            newGameState.BotSnapshots = diffLog.BotSnapshots;
+
             foreach (var bot in newGameState.Bots)
             {
                 bot.Value.GameTick = diffLog.CurrentTick;

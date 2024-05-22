@@ -7,6 +7,11 @@ public class GlobalSeededRandomizer
 
     public GlobalSeededRandomizer(IOptions<SproutopiaGameSettings> gameSettings)
     {
+#if RELEASE
+        string cloudSeed = Environment.GetEnvironmentVariable("WORLD_SEED") ?? "0";
+        gameSettings.Value.Seed = int.Parse(cloudSeed);
+#endif
+
         random = new Random(gameSettings.Value.Seed);
     }
 

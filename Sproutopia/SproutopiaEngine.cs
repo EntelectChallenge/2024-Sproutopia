@@ -1,5 +1,4 @@
-﻿using Domain;
-using Domain.Enums;
+﻿using Domain.Enums;
 using Domain.Interfaces;
 using Domain.Models;
 using Logger;
@@ -30,12 +29,16 @@ namespace Sproutopia
         public bool IsRunning { get; set; } = false;
 
         public static Timer ConnectionTimer;
+        private Serilog.Core.Logger _inputLogger;
 
 
         IStreamingFileLogger IEngine.StateLogger => new StreamingFileLogger(DateTime.Now.ToString("yy-MM-dd-THHmm"));
         IStreamingFileLogger IEngine.GameCompleteLogger => new StreamingFileLogger("GameComplete");
 
-        public bool IsBotRegistered(Guid botId) => _gameState.BotManager.IsBotRegistered(botId);
+        public bool IsBotAuthorized(Guid botId, string connectionId) =>
+            _gameState.BotManager.IsBotRegistered(botId) &&
+            _gameState.BotManager.IsBotConnectionValid(botId, connectionId);
+
 
         public bool IsStartConditionsMet() => _gameState.BotManager.BotCount() == _gameSettings.NumberOfPlayers;
 
@@ -48,7 +51,8 @@ namespace Sproutopia
                         ITickManager tickManager,
                         GameState gameState,
                         GlobalSeededRandomizer randomizer,
-                        ICloudIntegrationService cloudIntegrationService)
+                        ICloudIntegrationService cloudIntegrationService,
+                        Serilog.Core.Logger inputLogger)
         {
             _randomizer = randomizer;
             _tickManager = tickManager;
@@ -58,6 +62,7 @@ namespace Sproutopia
             _runnerContext = runnerContext;
             _gameSettings = settings.Value;
             _gameState = gameState;
+            _inputLogger = inputLogger;
             _cloudIntegrationService = cloudIntegrationService;
 
 
@@ -74,11 +79,11 @@ namespace Sproutopia
         {
             var sproutBotCommand = new SproutBotCommand(botCommand.BotId, (BotAction)botCommand.Action);
 
-            //TODO: add extra validation
-
             if (sproutBotCommand.Action.Equals(null) || sproutBotCommand.Action == BotAction.IDLE) return;
 
             Log.Debug($"{sproutBotCommand.BotId}: ADDING command {sproutBotCommand.Action} to Queue");
+            _inputLogger.Information($"Command,{sproutBotCommand.BotId},{sproutBotCommand.Action}");
+
             await _gameState.BotManager.EnqueueCommand(sproutBotCommand);
         }
 
@@ -95,6 +100,7 @@ namespace Sproutopia
 
         public void RegisterBot(Guid token, string nickName, string connectionId)
         {
+            _inputLogger.Information($"Register,{token},{nickName}");
             var registeredBotId = _gameState.AddBot(token, nickName, connectionId);
             _cloudIntegrationService.AddPlayer(0, registeredBotId.ToString(), 0, 0, registeredBotId.ToString());
         }

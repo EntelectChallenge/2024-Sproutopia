@@ -17,11 +17,12 @@ namespace Domain.Interfaces
         void RegisterBot(Guid Token, string NickName, string ConnectionId);
 
         /// <summary>
-        /// Determines if the bot is registered 
+        /// Determines if the bot is registered and the command is comming from the correct bot
         /// </summary>
         /// <param name="botId">Unique identifier for the Bot</param>
+        /// <param name="connectionId">Unique identifier for the specific signalR connection to the bot</param>
         /// <returns>True or false depicting whether the bot is registered or not</returns>
-        bool IsBotRegistered(Guid botId);
+        bool IsBotAuthorized(Guid botId, string connectionId);
 
         /// <summary>
         /// Determines if the start conditions are met 

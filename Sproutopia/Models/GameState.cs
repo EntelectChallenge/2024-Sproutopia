@@ -14,6 +14,7 @@ namespace Sproutopia.Models
 
         public int MaxTicks { set; get; }
         public int CurrentTick { get; set; }
+        public List<BotSnapshot> BotSnapshots { get; set; } = [];
         public int NumRows { get; private set; }
         public int NumCols { get; private set; }
         public int Seed { get; private set; }
@@ -150,7 +151,7 @@ namespace Sproutopia.Models
             int currentTick = CurrentTick;
             Dictionary<Guid, int> leaderBoard = GardenManager.Leaderboard().ToDictionary(tuple => tuple.botId, tuple => tuple.claimedPercentage);
             Dictionary<Guid, CellCoordinate> botPositions = botStates.Values.ToDictionary(b => b.BotId, b => b.Position);
-            Dictionary<Guid, BotAction> botDirections = botStates.Values.ToDictionary(b => b.BotId, b => b.LastCommand.Action);
+            Dictionary<Guid, BotAction> botDirections = botStates.Values.ToDictionary(b => b.BotId, b => b.Momentum);
             Dictionary<Guid, PowerUpType> botPowerUps = botStates
                 .Where(b => b.Value.GetActivePowerUp().HasValue)
                 .ToDictionary(b => b.Key, b => b.Value.GetActivePowerUp()!.Value);
@@ -172,6 +173,7 @@ namespace Sproutopia.Models
 
             var current = new DiffLog(
                 currentTick: currentTick,
+                botSnapshots: BotSnapshots,
                 leaderBoard: leaderBoard,
                 botPositions: botPositions,
                 botDirections: botDirections,
@@ -195,7 +197,7 @@ namespace Sproutopia.Models
             var powerUps = GardenManager.ViewPowerUps<PowerUpType>().Select(pu => new PowerUpLocation(new(pu.Coords.X, pu.Coords.Y), (int)pu.PowerupType)).ToArray();
             var weeds = GardenManager.ViewWeeds();
 
-            return new(CurrentTick, heroWindow, MapAllBotsToDto(), powerUps, weeds);
+            return new(CurrentTick, BotSnapshots, heroWindow, MapAllBotsToDto(), powerUps, weeds);
         }
 
         public GameInfoDTO MapToGameInfoDto()
@@ -242,7 +244,7 @@ namespace Sproutopia.Models
             var weeds = GardenManager.ViewWeeds(x, y, HeroWindowSize);
 
             return new BotStateDTO(
-                directionState: (int)bot.LastCommand.Action,
+                directionState: (int)bot.Momentum,
                 elapsedTime: TimeProvider.System.GetUtcNow().ToString(),
                 gameTick: CurrentTick,
                 powerUp: (int)(bot.GetActivePowerUp() ?? 0),

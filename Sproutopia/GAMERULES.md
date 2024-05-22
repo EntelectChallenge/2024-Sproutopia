@@ -78,7 +78,7 @@ The land of Sproutopia is a much sought after land and with four farmers vying f
 
 - #### Encircling
 
-  If a farmer completely encircles another farmer and completes its trail to claim the encircled territory, the encircled farmer is pruned and respawned in its respawn position. All of the territory that belonged to the encircled farmer is transfered to the encricling farmer.
+  If a farmer completely encircles another farmer and completes its trail to claim the encircled territory, the encircled farmer is pruned and respawned in its respawn position. All of the territory that belonged to the encircled farmer is transfered to the encircling farmer, **with the exception of the encircled farmer's starting territory ( the orignal 9 plots/cells given at the start of a match)**.
 
 - #### Stealing of Territory
 

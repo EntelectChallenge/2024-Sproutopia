@@ -23,6 +23,7 @@ namespace Sproutopia
         private readonly GlobalSeededRandomizer _randomizer;
         private Serilog.Core.Logger _endGameLogger;
         private Serilog.Core.Logger _gameLogger;
+        private Serilog.Core.Logger _inputLogger;
 #if DEBUG
         private readonly IHubContext<VisualiserHub> _visualiserContext;
 #endif
@@ -34,7 +35,8 @@ namespace Sproutopia
             IHubContext<VisualiserHub> visualiserContext,
             ICloudIntegrationService cloudIntegrationService,
             GlobalSeededRandomizer randomizer,
-            IHubContext<RunnerHub> runnerContext)
+            IHubContext<RunnerHub> runnerContext,
+            Serilog.Core.Logger inputLogger)
         {
             _gameState = gameState;
             _gameSettings = settings.Value;
@@ -44,6 +46,7 @@ namespace Sproutopia
 #endif
             _runnerContext = runnerContext;
             _randomizer = randomizer;
+            _inputLogger = inputLogger;
             _cloudIntegrationService = cloudIntegrationService;
 
             var LOG_DIRECTORY = Environment.GetEnvironmentVariable("LOG_DIR") ?? Path.Combine(AppContext.BaseDirectory[..AppContext.BaseDirectory.IndexOf("Sproutopia")], "Logs");
@@ -86,6 +89,53 @@ namespace Sproutopia
 
         private async Task GameLoop(CancellationToken stoppingToken)
         {
+            Dictionary<int, List<SproutBotCommand>> tickCommands = [];
+
+            // Read input log if provided
+            if (!string.IsNullOrEmpty(_gameSettings.InputLogFile))
+            {
+                List<SproutBotCommand> currentCommands = [];
+                int currentTick = 0;
+
+                foreach (var line in File.ReadLines(_gameSettings.InputLogFile))
+                {
+                    var trimLine = line.Split(" - ")[1];
+
+                    if (trimLine.StartsWith("Register"))
+                    {
+                        var registerElements = trimLine.Split(',');
+                        _gameState.AddBot(Guid.Parse(registerElements[1]), registerElements[2], Guid.NewGuid().ToString());
+                    }
+
+                    if (trimLine.StartsWith("Tick"))
+                    {
+                        currentTick = int.Parse(trimLine.Split(',')[1]);
+                        tickCommands.Add(currentTick, currentCommands);
+                        currentCommands = [];
+                    }
+
+                    if (trimLine.StartsWith("Command"))
+                    {
+                        var botId = Guid.Parse(trimLine.Split(',')[1]);
+                        var cmd = trimLine.Split(',')[2] switch
+                        {
+                            "Up" => BotAction.Up,
+                            "Down" => BotAction.Down,
+                            "Left" => BotAction.Left,
+                            "Right" => BotAction.Right,
+                            _ => BotAction.IDLE,
+                        };
+
+                        currentCommands.Add(new SproutBotCommand(botId, cmd));
+                    }
+                }
+
+                Console.WriteLine("Ready to start replaying input log. If you want to connect a visualizer first, now is a good time.");
+                Console.WriteLine("Press any key to continue.");
+                Console.ReadKey();
+                _tickManager.StartTimer();
+            }
+
             var nextWeedSpawn = (int)_randomizer.NextNormal(
                 _gameSettings.WeedSpawnRateMean,
                 _gameSettings.WeedSpawnRateStdDev,
@@ -107,9 +157,20 @@ namespace Sproutopia
                     if (!_gameState.GameOver)
                     {
                         Log.Debug($"TICK: {_tickManager.CurrentTick}");
+                        _inputLogger.Information($"Tick,{_tickManager.CurrentTick}");
+
+                        // Add commands for current tick from input log (if provided) to bot queues
+                        if (tickCommands.TryGetValue(_tickManager.CurrentTick, out var newCommands))
+                        {
+                            foreach (var command in newCommands)
+                            {
+                                await _gameState.BotManager.EnqueueCommand(command);
+                            }
+                        }
 
                         var respawnList = new List<Guid>();
                         var interruptedList = new List<Guid>();
+                        _gameState.BotSnapshots = [];
 
                         #region STAGE 1
 
@@ -145,6 +206,13 @@ namespace Sproutopia
 
                         foreach (var command in sproutBotCommands)
                         {
+                            _gameState.BotSnapshots.Add(
+                                new BotSnapshot(
+                                    timeStamp: command.TimeStamp,
+                                    botId: command.BotId,
+                                    action: command.Action,
+                                    momentum: _gameState.BotManager.GetBotState(command.BotId).Momentum));
+
                             if (respawnList.Contains(command.BotId) || interruptedList.Contains(command.BotId))
                                 continue;
 
@@ -153,7 +221,7 @@ namespace Sproutopia
                             // against the current bot state would be wrong so the logic has been moved here.
                             var momentum = _gameState.BotManager.GetBotState(command.BotId).Momentum;
                             if (command.Action == ExtensionMethods.Reverse(momentum))
-                                continue;
+                                command.Action = momentum;
 
                             var (pruned, interrupted) = _gameState.IssueCommand(command);
                             respawnList.AddRange(pruned.Except(respawnList));
@@ -233,11 +301,18 @@ namespace Sproutopia
                                 _cloudIntegrationService.UpdatePlayer(bot.Key.ToString());
                             });
 
-                        var diffLog = _gameState.MapToDiffLog(prevGameState);
-                        prevGameState = _gameState.MapToDiffLog(new DiffLog()); // last remembered state has to be absolute, not relative
+                        if (_gameSettings.DifferentialLoggingEnabled)
+                        {
 
-                        _gameLogger.Information("{@_gameState}", Newtonsoft.Json.JsonConvert.SerializeObject(diffLog)); // System.Text.Json does not render this object correctly, hence Newtonsoft
+                            var diffLog = _gameState.MapToDiffLog(prevGameState);
+                            prevGameState = _gameState.MapToDiffLog(new DiffLog()); // last remembered state has to be absolute, not relative
 
+                            _gameLogger.Information("{@_gameState}", Newtonsoft.Json.JsonConvert.SerializeObject(diffLog)); // System.Text.Json does not render this object correctly, hence Newtonsoft
+                        }
+                        else
+                        {
+                            _gameLogger.Information("{@_gameState}", Newtonsoft.Json.JsonConvert.SerializeObject(_gameState.MapAllToDto())); // System.Text.Json does not render this object correctly, hence Newtonsoft
+                        }
                         #endregion
                     }
                 }

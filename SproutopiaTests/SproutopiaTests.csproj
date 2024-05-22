@@ -36,6 +36,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="InputLogsTestFiles\*.*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
     <None Update="appsettings.Test.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

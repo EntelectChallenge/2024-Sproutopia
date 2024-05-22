@@ -20,6 +20,7 @@ namespace Sproutopia
     public static class Program
     {
         private static IConfigurationRoot? configuration;
+        private static Serilog.Core.Logger _inputLogger;
 
         public static async Task Main(string[] args)
         {
@@ -41,9 +42,17 @@ namespace Sproutopia
                 .WriteTo.Console(outputTemplate: "{Timestamp:o} {Level} {SourceContext} - {Message}{NewLine}{Expression}")
                 .MinimumLevel.Debug()
                 .CreateLogger();
-
+            
             var LOG_DIRECTORY = Environment.GetEnvironmentVariable("LOG_DIR") ?? Path.Combine(AppContext.BaseDirectory[..AppContext.BaseDirectory.IndexOf("Sproutopia")], "Logs");
             Environment.SetEnvironmentVariable("LOG_DIR", LOG_DIRECTORY);
+
+            var filename = DateTime.Now.ToString("yyMMddHHmmss");
+
+            _inputLogger = new LoggerConfiguration()
+                .Enrich.FromLogContext()
+                .MinimumLevel.Information()
+                .WriteTo.File(Path.Combine(LOG_DIRECTORY, $"{filename}_inputs.log"), outputTemplate: "{Timestamp:o} {Level} - {Message}{NewLine}{Expression}")
+                .CreateLogger();
 
             AppSettings appSettings = new();
             ILogger<CloudIntegrationService> cloudLog = new SerilogLoggerFactory(Log.Logger).CreateLogger<CloudIntegrationService>();
@@ -54,6 +63,7 @@ namespace Sproutopia
                 IHost host = Host.CreateDefaultBuilder(args)
                     .ConfigureServices((context, services) =>
                     {
+                        services.AddSingleton<Serilog.Core.Logger>(_inputLogger);
                         services.AddSingleton<IConfiguration>(provider => configuration);
                         services.AddSingleton<AppSettings>();
                         services.Configure<SproutopiaGameSettings>(configuration.GetSection("GameSettings"));

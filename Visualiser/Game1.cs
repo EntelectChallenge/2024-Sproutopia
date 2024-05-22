@@ -9,9 +9,11 @@ using Sproutopia.Models;
 using Sproutopia.Utilities;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
-using Visualiser.Utils.Camera;
+using System.Text;
 using System.Threading;
+using Visualiser.Utils.Camera;
 using Forms = System.Windows.Forms;
 
 
@@ -32,6 +34,7 @@ namespace Visualiser
         private readonly IConfiguration GameConfig;
         private IConfigurationBuilder GameConfigBuilder;
         private bool _connectToEngine;
+        private Stopwatch stopwatch = Stopwatch.StartNew();
 
 
         private GameStateDto GameState { get; set; }
@@ -53,6 +56,9 @@ namespace Visualiser
         private Vector2 _botControllerPlacement { get; set; }
         private SpriteFont _arial { get; set; }
 
+        private int _delay = 1000;
+        private int _direction = 1;
+
 
         #region Declare Textures
         Texture2D buttonPlayTexture;
@@ -62,20 +68,31 @@ namespace Visualiser
         private Texture2D EmptyTexture;
         private List<Texture2D> PlayerTextures;
 
-        private Texture2D SuperFertizerTexture;
+        private Texture2D SuperFertilizerTexture;
         private Texture2D TerritoryImmunityTexture;
         private Texture2D UnprunableTexture;
         private Texture2D FreezeTexture;
+        private Texture2D TrailProtectionTexture;
         // private BotStateSprite botStateSprites;
 
         #endregion
 
         #region UI Elements
 
+        // Game engine buttons
         private Button _playToggleButton;
         private Button _pauseButton;
         private Button _stepButton;
         private Button _continueButton;
+
+        // Log replay buttons
+        private Button _replayButton;
+        private Button _forwardButton;
+        private Button _backwardButton;
+        private Button _pauseLogButton;
+        private Button _walkButton;
+        private Button _runButton;
+        private Button _sprintButton;
 
         #endregion
 
@@ -109,46 +126,59 @@ namespace Visualiser
             if (!_connectToEngine)
             {
                 var logFilePath = string.Empty;
-            
-                var thread = new Thread((ThreadStart)(() =>
-                {
-                    Forms.OpenFileDialog openFileDialog= new ();
 
-                    openFileDialog.Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*";
-                    openFileDialog.FilterIndex = 2;
-                    openFileDialog.RestoreDirectory = true;
+                var thread = new Thread(() =>
+                {
+                    Forms.OpenFileDialog openFileDialog = new()
+                    {
+                        Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*",
+                        FilterIndex = 2,
+                        RestoreDirectory = true
+                    };
 
                     if (openFileDialog.ShowDialog() == Forms.DialogResult.OK)
                     {
                         logFilePath = openFileDialog.FileName;
                     }
-                }));
+                });
 
                 thread.SetApartmentState(ApartmentState.STA);
                 thread.Start();
                 thread.Join();
 
-                var diffLogs = Helpers.LoadJson<DiffLog>(logFilePath, new[] { "\r\n", "\n", "\r" });
-                var newLand = Helpers.CreateJaggedArray<int[][]>(rows, cols);
-                Helpers.SetAllValues(newLand, 255);
-                var gameState = new GameStateDto(
-                    currentTick: 0,
-                    land: newLand,
-                    bots: new Dictionary<Guid, Runner.DTOs.BotStateDTO>(),
-                    powerUps: Array.Empty<PowerUpLocation>(),
-                    weeds: Helpers.CreateJaggedArray<bool[][]>(rows, cols)
-                    );
-
-                foreach (var diffLog in diffLogs)
+                if (GameSettings.GetValue<bool>("DifferentialLoggingEnabled"))
                 {
-                    gameState = gameState.ApplyDiff(diffLog);
-                    GameStateLogs.Add(gameState);
+                    var diffLogs = Helpers.LoadJson<DiffLog>(logFilePath, ["\r\n", "\n", "\r"]);
+                    var newLand = Helpers.CreateJaggedArray<int[][]>(rows, cols);
+                    Helpers.SetAllValues(newLand, 255);
+                    var gameState = new GameStateDto(
+                        currentTick: 0,
+                        botSnapshots: [],
+                        land: newLand,
+                        bots: new Dictionary<Guid, BotStateDTO>(),
+                        powerUps: Array.Empty<PowerUpLocation>(),
+                        weeds: Helpers.CreateJaggedArray<bool[][]>(rows, cols)
+                        );
+
+                    foreach (var diffLog in diffLogs)
+                    {
+                        gameState = gameState.ApplyDiff(diffLog);
+                        GameStateLogs.Add(gameState);
+                    }
+                }
+                else
+                {
+                    var logs = Helpers.LoadJson<GameStateDto>(logFilePath, ["\r\n", "\n", "\r"]);
+
+                    foreach (var log in logs)
+                    {
+                        GameStateLogs.Add(log);
+                    }
                 }
             }
-            
+
             _oneShotMouseState = OneShotMouseButton.GetState();
 
-            //TODO: how to make this configurable
             levelLoader = new(_padding, rows, cols);
             levelLoader.AddLevel(_initalPadding);
 
@@ -185,14 +215,18 @@ namespace Visualiser
                 connection = new HubConnectionBuilder()
                     .WithUrl("http://localhost:5000/visualiserhub")
                     .WithAutomaticReconnect()
-                    .Build(); 
+                    .Build();
             }
-            
+
             base.Initialize();
         }
 
         protected override void LoadContent()
         {
+            var GameSettings = GameConfig.GetSection("GameSettings");
+            var rows = GameSettings.GetValue<int>("Rows");
+            var cols = GameSettings.GetValue<int>("Cols");
+
             _spriteBatch = new SpriteBatch(GraphicsDevice);
 
             _arial = Content.Load<SpriteFont>("Arial");
@@ -212,57 +246,126 @@ namespace Visualiser
 
             //PowerUps
 
-            this.SuperFertizerTexture = Content.Load<Texture2D>("PowerUps/superFertilizer");
+            this.SuperFertilizerTexture = Content.Load<Texture2D>("PowerUps/superFertilizer");
             this.FreezeTexture = Content.Load<Texture2D>("PowerUps/freeze2");
             this.TerritoryImmunityTexture = Content.Load<Texture2D>("PowerUps/territoryImmunity2");
             this.UnprunableTexture = Content.Load<Texture2D>("PowerUps/unprunable2");
+            this.TrailProtectionTexture = Content.Load<Texture2D>("PowerUps/trailProtection2");
 
             #endregion
 
             #region Load Buttons
 
-            if (_connectToEngine)
-            {
-                _playToggleButton = new(
-                    staticImage: Content.Load<Texture2D>("play"),
-                    clickedImage: Content.Load<Texture2D>("play"),
-                    dimensions: new(64, 64),
-                    position: new(0, 0),
-                    name: "play",
-                    id: 33,
-                    visible: true,
-                    layerDepth: 1.0f);
+            _playToggleButton = new(
+                staticImage: Content.Load<Texture2D>("play"),
+                clickedImage: Content.Load<Texture2D>("play"),
+                dimensions: new(64, 64),
+                position: new(0, 0),
+                name: "play",
+                id: 33,
+                visible: true,
+                layerDepth: 1.0f);
 
-                _pauseButton = new(
-                    staticImage: Content.Load<Texture2D>("pause"),
-                    clickedImage: Content.Load<Texture2D>("pause"),
-                    dimensions: new(6, 68),
-                    position: new(44, 0),
-                    name: "pause",
-                    id: 34,
-                    visible: true,
-                    layerDepth: 1.0f);
+            _pauseButton = new(
+                staticImage: Content.Load<Texture2D>("pause"),
+                clickedImage: Content.Load<Texture2D>("pause"),
+                dimensions: new(6, 68),
+                position: new(44, 0),
+                name: "pause",
+                id: 34,
+                visible: true,
+                layerDepth: 1.0f);
 
-                /*            _continueButton = new(
-                                staticImage: Content.Load<Texture2D>("ButtonStop"),
-                                clickedImage: Content.Load<Texture2D>("ButtonStop"),
-                                dimensions: new(131, 121),
-                                position: new(0, 261),
-                                name: "pause",
-                                id: 35,
-                                visible: true,
-                                layerDepth: 1.0f);*/
+            /*            _continueButton = new(
+                            staticImage: Content.Load<Texture2D>("ButtonStop"),
+                            clickedImage: Content.Load<Texture2D>("ButtonStop"),
+                            dimensions: new(131, 121),
+                            position: new(0, 261),
+                            name: "pause",
+                            id: 35,
+                            visible: true,
+                            layerDepth: 1.0f);*/
 
-                _stepButton = new(
-                    staticImage: Content.Load<Texture2D>("step"),
-                    clickedImage: Content.Load<Texture2D>("step"),
-                    dimensions: new(64, 86),
-                    position: new(90, 0),
-                    name: "pause",
-                    id: 35,
-                    visible: true,
-                    layerDepth: 1.0f);
-            }
+            _stepButton = new(
+                staticImage: Content.Load<Texture2D>("step"),
+                clickedImage: Content.Load<Texture2D>("step"),
+                dimensions: new(64, 86),
+                position: new(90, 0),
+                name: "pause",
+                id: 35,
+                visible: true,
+                layerDepth: 1.0f);
+
+            _replayButton = new(
+                staticImage: Content.Load<Texture2D>("replay"),
+                clickedImage: Content.Load<Texture2D>("replay"),
+                dimensions: new(64, 64),
+                position: new(42 * 0 + _padding, _padding * rows),
+                name: "replay",
+                id: 36,
+                visible: true,
+                layerDepth: 1.0f);
+
+            _backwardButton = new(
+                staticImage: Content.Load<Texture2D>("backward"),
+                clickedImage: Content.Load<Texture2D>("backward"),
+                dimensions: new(64, 64),
+                position: new(42 * 1 + _padding, _padding * rows),
+                name: "backward",
+                id: 37,
+                visible: true,
+                layerDepth: 1.0f);
+
+            _pauseLogButton = new(
+                staticImage: Content.Load<Texture2D>("pause"),
+                clickedImage: Content.Load<Texture2D>("pause"),
+                dimensions: new(64, 64),
+                position: new(42 * 2 + _padding, _padding * rows),
+                name: "pauselog",
+                id: 38,
+                visible: true,
+                layerDepth: 1.0f);
+
+            _forwardButton = new(
+                staticImage: Content.Load<Texture2D>("forward"),
+                clickedImage: Content.Load<Texture2D>("forward"),
+                dimensions: new(64, 64),
+                position: new(42 * 3 + _padding, _padding * rows),
+                name: "forward",
+                id: 39,
+                visible: true,
+                layerDepth: 1.0f);
+
+            _walkButton = new(
+                staticImage: Content.Load<Texture2D>("walk"),
+                clickedImage: Content.Load<Texture2D>("walk"),
+                dimensions: new(64, 64),
+                position: new(42 * 5 + _padding, _padding * rows),
+                name: "walk",
+                id: 40,
+                visible: true,
+                layerDepth: 1.0f);
+
+            _runButton = new(
+                staticImage: Content.Load<Texture2D>("run"),
+                clickedImage: Content.Load<Texture2D>("run"),
+                dimensions: new(64, 64),
+                position: new(42 * 6 + _padding, _padding * rows),
+                name: "run",
+                id: 41,
+                visible: true,
+                layerDepth: 1.0f);
+
+            _sprintButton = new(
+                staticImage: Content.Load<Texture2D>("sprint"),
+                clickedImage: Content.Load<Texture2D>("sprint"),
+                dimensions: new(64, 64),
+                position: new(42 * 7 + _padding, _padding * rows),
+                name: "sprint",
+                id: 42,
+                visible: true,
+                layerDepth: 1.0f);
+
 
             #endregion
         }
@@ -336,10 +439,57 @@ namespace Visualiser
             }
             else
             {
-                if (GameStateLogs.Count > 0 && _currentTick < GameStateLogs.Count)
+                HandelInput(gameTime);
+                _replayButton.UpdateButton();
+                _forwardButton.UpdateButton();
+                _backwardButton.UpdateButton();
+                _pauseLogButton.UpdateButton();
+                _walkButton.UpdateButton();
+                _runButton.UpdateButton();
+                _sprintButton.UpdateButton();
+
+                if (_mouseLeftPressed)
+                {
+                    _mouseLeftPressed = false;
+
+                    if (CheckIfButtonWasClicked(_replayButton))
+                        _currentTick = 0;
+
+                    if (CheckIfButtonWasClicked(_forwardButton))
+                    {
+                        _direction = 1;
+                    }
+                    if (CheckIfButtonWasClicked(_backwardButton))
+                    {
+                        _direction = -1;
+                    }
+                    if (CheckIfButtonWasClicked(_pauseLogButton))
+                    {
+                        _direction = 0;
+                    }
+                    if (CheckIfButtonWasClicked(_walkButton))
+                    {
+                        _delay = 1000;
+                    }
+                    if (CheckIfButtonWasClicked(_runButton))
+                    {
+                        _delay = 300;
+                    }
+                    if (CheckIfButtonWasClicked(_sprintButton))
+                    {
+                        _delay = 20;
+                    }
+                }
+
+                if (stopwatch.ElapsedMilliseconds < _delay)
+                    return;
+
+                stopwatch.Restart();
+
+                if (GameStateLogs.Count > 0 && _currentTick < GameStateLogs.Count && _currentTick >= 0)
                 {
                     GameState = GameStateLogs[_currentTick];
-                    _currentTick += 1;
+                    _currentTick += _direction;
                 }
             }
 
@@ -405,22 +555,46 @@ namespace Visualiser
                 {
                     DrawCursor(_cursor);
                 }
-                _spriteBatch.End();
-            }
 
-            if (_connectToEngine)
-            {
-                _spriteBatch.Begin();
+                #region Print Game State
 
-                #region Draw UI 
-                _spriteBatch.Draw(_playToggleButton.Texture, UIRectangle(_playToggleButton.Position, 40), Color.White);
-                _spriteBatch.Draw(_pauseButton.Texture, UIRectangle(_pauseButton.Position, 40), Color.White);
-                _spriteBatch.Draw(_stepButton.Texture, UIRectangle(_stepButton.Position, 40), Color.White);
-                //  _spriteBatch.Draw(_continueButton.Texture, _continueButton.Position, Color.White);
+                var sb = new StringBuilder();
+                foreach (var x in GameState.Bots.Select((bot, index) => new { bot, index }))
+                {
+                    sb.AppendLine($"{x.index}:{x.bot.Key.ToString().Substring(0, 4)}...");
+                }
+
+                _spriteBatch.DrawString(_arial, sb.ToString(), new Vector2(810, 10), Color.Black);
+                _spriteBatch.DrawString(_arial, GameState.ToString(), new Vector2(810, 100), Color.Black);
+
                 #endregion
 
                 _spriteBatch.End();
             }
+
+            #region Draw UI 
+            _spriteBatch.Begin();
+
+            if (_connectToEngine)
+            {
+                _spriteBatch.Draw(_playToggleButton.Texture, UIRectangle(_playToggleButton.Position, 40), Color.White);
+                _spriteBatch.Draw(_pauseButton.Texture, UIRectangle(_pauseButton.Position, 40), Color.White);
+                _spriteBatch.Draw(_stepButton.Texture, UIRectangle(_stepButton.Position, 40), Color.White);
+                //  _spriteBatch.Draw(_continueButton.Texture, _continueButton.Position, Color.White);
+            }
+            else
+            {
+                _spriteBatch.Draw(_replayButton.Texture, UIRectangle(_replayButton.Position, 40), Color.White);
+                _spriteBatch.Draw(_forwardButton.Texture, UIRectangle(_forwardButton.Position, 40), Color.White);
+                _spriteBatch.Draw(_backwardButton.Texture, UIRectangle(_backwardButton.Position, 40), Color.White);
+                _spriteBatch.Draw(_pauseLogButton.Texture, UIRectangle(_pauseLogButton.Position, 40), Color.White);
+                _spriteBatch.Draw(_walkButton.Texture, UIRectangle(_walkButton.Position, 40), Color.White);
+                _spriteBatch.Draw(_runButton.Texture, UIRectangle(_runButton.Position, 40), Color.White);
+                _spriteBatch.Draw(_sprintButton.Texture, UIRectangle(_sprintButton.Position, 40), Color.White);
+            }
+
+            _spriteBatch.End();
+            #endregion
 
             base.Draw(gameTime);
         }
@@ -527,9 +701,11 @@ namespace Visualiser
                 case 3:
                     return this.FreezeTexture;
                 case 4:
-                    return this.TrailTexture;
+                    return this.TrailProtectionTexture;
+                case 5:
+                    return this.SuperFertilizerTexture;
                 default:
-                    return this.SuperFertizerTexture;
+                    return this.EmptyTexture;
             }
         }
 
@@ -599,17 +775,17 @@ namespace Visualiser
                 case 1:
                     return Color.DarkBlue;
                 case 2:
-                    return Color.Yellow;
+                    return Color.DarkGreen;
                 case 3:
-                    return Color.Red;
+                    return Color.SandyBrown;
                 case 4:
-                    return Color.PaleVioletRed;
+                    return Color.Pink;
                 case 5:
                     return Color.LightBlue;
                 case 6:
-                    return Color.MediumOrchid;
+                    return Color.LightGreen;
                 case 7:
-                    return Color.Maroon;
+                    return Color.Yellow;
                 case 8:
                     return Color.Black;
                 default: return Color.White;
@@ -723,5 +899,5 @@ namespace Visualiser
         }
 
     }
-    
+
 }

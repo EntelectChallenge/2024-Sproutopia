@@ -1,6 +1,7 @@
 ﻿using Domain.Enums;
 using Domain.Models;
 using Microsoft.Extensions.Options;
+using Serilog;
 using Sproutopia.Enums;
 using Sproutopia.Models;
 
@@ -23,6 +24,14 @@ namespace Sproutopia.Managers
         }
 
         public bool IsBotRegistered(Guid botId) => _bots.ContainsKey(botId);
+
+        public bool IsBotConnectionValid(Guid botId, string connectionId)
+        {
+            var restult = _bots[botId].ConnectionId == connectionId;
+            Log.Debug($"{botId}: Inconsistent connection ID");
+            return restult;
+
+        }
 
         public Dictionary<Guid, BotState> GetAllBotStates()
         {

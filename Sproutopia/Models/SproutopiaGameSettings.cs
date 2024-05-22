@@ -14,7 +14,7 @@ namespace Sproutopia.Models
         [JsonPropertyName("Cols")]
         [Description("Width of game world")]
         public int Cols { get; set; }
-        
+
         [JsonPropertyName("Seed")]
         [Description("Seed value for deterministic randomization")]
         public int Seed { get; set; }
@@ -28,6 +28,10 @@ namespace Sproutopia.Models
         [Description("Frequency (in milliseconds) of ticks")]
         [Range(50, 250, ErrorMessage = "Value for {0} must be between {1} and {2} ms.")]
         public int TickRate { get; set; }
+
+        [JsonPropertyName("DifferentialLoggingEnabled")]
+        [Description("Enable differentail logging")]
+        public bool DifferentialLoggingEnabled { get; set; }
 
         [JsonPropertyName("PlayerWindowSize")]
         [Description("Size of the game world visible to each player")]
@@ -114,6 +118,10 @@ namespace Sproutopia.Models
         [JsonPropertyName("LifespanFertilizer")]
         [Description("Duration (in ticks) of Super Fertilizer powerup")]
         public int LifespanFertilizer { get; set; }
+
+        [JsonPropertyName("InputLogFile")]
+        [Description("File to be used for replaying bot inputs")]
+        public string InputLogFile { get; set; }
     }
 
 }
