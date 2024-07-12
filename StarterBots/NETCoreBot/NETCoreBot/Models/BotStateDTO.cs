@@ -36,9 +36,9 @@
             }
 
             var window = "";
-            for (int y = HeroWindow[0].Length - 1; y >= 0; y--)
+            for (int y = HeroWindow[0].Count - 1; y >= 0; y--)
             {
-                for (int x = 0; x < HeroWindow.Length; x++)
+                for (int x = 0; x < HeroWindow.Count; x++)
                 {
                     window += $"{HeroWindow[x][y]}";
                 }

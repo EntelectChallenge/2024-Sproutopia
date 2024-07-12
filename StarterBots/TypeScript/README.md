@@ -1,4 +1,4 @@
-# Cy-Fi TypeScript Starter Bot
+# Sproutopia TypeScript Starter Bot
 
 ## Setting up
 

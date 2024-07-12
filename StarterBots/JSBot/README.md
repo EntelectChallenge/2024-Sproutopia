@@ -1,4 +1,4 @@
-# Cy-Fi JavaScript Starter Bot
+# Sproutopia JavaScript Starter Bot
 
 ## Setting up
 

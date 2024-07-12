@@ -626,6 +626,12 @@ public class GardenManager : IGardenManager
                     g.ClaimedLand = g.ClaimedLand.Difference(_gardens[botId].ClaimedLand);
                 }
             }
+
+            // If super fertilizer has been excavated, convert trail to territory
+            if (superPowerUpExcavated?.PowerUpType == SuperPowerUpType.SuperFertilizer && botGarden.HasTrail)
+            {
+                CompleteTrail(botId);
+            }
         }
 
         return new BotResponse

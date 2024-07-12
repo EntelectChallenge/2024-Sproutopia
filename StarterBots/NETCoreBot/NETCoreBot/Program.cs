@@ -2,12 +2,7 @@
 using Microsoft.Extensions.Configuration;
 using NETCoreBot.Models;
 using NETCoreBot.Services;
-using System;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Configuration.Json;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 namespace NETCoreBot
 {
@@ -18,10 +13,8 @@ namespace NETCoreBot
         private static async Task Main(string[] args)
         {
 
-            string executableDirectory = AppDomain.CurrentDomain.BaseDirectory;
             // Set up configuration sources.
             var builder = new ConfigurationBuilder()
-                .SetBasePath(executableDirectory+"../../../")
                 .AddJsonFile(
                 $"appsettings.json",
                 optional: false);
@@ -96,7 +89,7 @@ namespace NETCoreBot
                 }
                 Console.WriteLine($"Bot ID: {botId}");
                 Console.WriteLine(
-                    $"Position: ({state.X}, {state.Y}), Collected: {state.Collected}, Level: {state.CurrentLevel}"
+                    $"Position: ({state.X}, {state.Y})"
                 );
                 Console.WriteLine(state.PrintWindow());
             }

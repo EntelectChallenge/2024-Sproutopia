@@ -216,6 +216,12 @@ namespace Visualiser
                     .WithUrl("http://localhost:5000/visualiserhub")
                     .WithAutomaticReconnect()
                     .Build();
+
+                connection.On<GameStateDto>(VisualiserCommands.ReceiveInitialGameState, state =>
+                {
+                    GameState = state;
+                });
+
             }
 
             base.Initialize();
@@ -310,7 +316,7 @@ namespace Visualiser
                 staticImage: Content.Load<Texture2D>("backward"),
                 clickedImage: Content.Load<Texture2D>("backward"),
                 dimensions: new(64, 64),
-                position: new(42 * 1 + _padding, _padding * rows),
+                position: new(42 * 2 + _padding, _padding * rows),
                 name: "backward",
                 id: 37,
                 visible: true,
@@ -320,7 +326,7 @@ namespace Visualiser
                 staticImage: Content.Load<Texture2D>("pause"),
                 clickedImage: Content.Load<Texture2D>("pause"),
                 dimensions: new(64, 64),
-                position: new(42 * 2 + _padding, _padding * rows),
+                position: new(42 * 4 + _padding, _padding * rows),
                 name: "pauselog",
                 id: 38,
                 visible: true,
@@ -330,7 +336,7 @@ namespace Visualiser
                 staticImage: Content.Load<Texture2D>("forward"),
                 clickedImage: Content.Load<Texture2D>("forward"),
                 dimensions: new(64, 64),
-                position: new(42 * 3 + _padding, _padding * rows),
+                position: new(42 * 6 + _padding, _padding * rows),
                 name: "forward",
                 id: 39,
                 visible: true,
@@ -340,7 +346,7 @@ namespace Visualiser
                 staticImage: Content.Load<Texture2D>("walk"),
                 clickedImage: Content.Load<Texture2D>("walk"),
                 dimensions: new(64, 64),
-                position: new(42 * 5 + _padding, _padding * rows),
+                position: new(42 * 8 + _padding, _padding * rows),
                 name: "walk",
                 id: 40,
                 visible: true,
@@ -350,7 +356,7 @@ namespace Visualiser
                 staticImage: Content.Load<Texture2D>("run"),
                 clickedImage: Content.Load<Texture2D>("run"),
                 dimensions: new(64, 64),
-                position: new(42 * 6 + _padding, _padding * rows),
+                position: new(42 * 10 + _padding, _padding * rows),
                 name: "run",
                 id: 41,
                 visible: true,
@@ -360,7 +366,7 @@ namespace Visualiser
                 staticImage: Content.Load<Texture2D>("sprint"),
                 clickedImage: Content.Load<Texture2D>("sprint"),
                 dimensions: new(64, 64),
-                position: new(42 * 7 + _padding, _padding * rows),
+                position: new(42 * 12 + _padding, _padding * rows),
                 name: "sprint",
                 id: 42,
                 visible: true,
@@ -396,17 +402,13 @@ namespace Visualiser
 
                 #endregion
 
-                #region UI Inputs
 
                 HandelInput(gameTime);
                 _playToggleButton.UpdateButton();
                 _pauseButton.UpdateButton();
                 _stepButton.UpdateButton();
 
-                connection.On<GameStateDto>(VisualiserCommands.ReceiveInitialGameState, state =>
-                {
-                    GameState = state;
-                });
+                #region UI Inputs
 
                 if (_mouseLeftPressed)
                 {
@@ -440,10 +442,13 @@ namespace Visualiser
             else
             {
                 HandelInput(gameTime);
+                
                 _replayButton.UpdateButton();
+                
                 _forwardButton.UpdateButton();
                 _backwardButton.UpdateButton();
                 _pauseLogButton.UpdateButton();
+                
                 _walkButton.UpdateButton();
                 _runButton.UpdateButton();
                 _sprintButton.UpdateButton();
@@ -490,6 +495,11 @@ namespace Visualiser
                 {
                     GameState = GameStateLogs[_currentTick];
                     _currentTick += _direction;
+
+                    if (_currentTick < 0)
+                    {
+                        _currentTick += 1;
+                    }
                 }
             }
 
@@ -863,6 +873,7 @@ namespace Visualiser
 
                 }
             }
+
             public void AddLevel(int startingPadding)
             {
                 var paddingX = startingPadding;

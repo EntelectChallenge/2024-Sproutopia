@@ -1,0 +1,7 @@
+[Bb]in/
+[Oo]bj/
+.idea/
+.vscode/
+Dockerfile
+.dockerignore
+.gitignore
