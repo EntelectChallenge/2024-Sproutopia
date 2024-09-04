@@ -1,0 +1,12 @@
+debug/
+target/
+
+**/*.rs.bk
+*.pdb
+.idea/
+.vscode/
+.git/
+.gitignore
+Dockerfile
+.dockerignore
+README.md

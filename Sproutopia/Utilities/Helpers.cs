@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json;
+using Sproutopia.Models;
 using System.Diagnostics;
 
 namespace Sproutopia.Utilities
@@ -100,13 +101,44 @@ namespace Sproutopia.Utilities
 
             return jsonObjects;
         }
-        
+
+        public static LogType IdentifyLogFile(string filePath)
+        {
+            string? jsonString;
+            using (var reader = new StreamReader(filePath))
+            {
+                jsonString = reader.ReadLine();
+            }
+
+            if (jsonString == null)
+                return LogType.Unknown;
+
+            if (TryDeserialize<GameStateDto>(jsonString, out _))
+                return LogType.FullLog;
+
+            if (TryDeserialize<DiffLog>(jsonString, out _))
+                return LogType.DiffLog;
+
+            return LogType.Unknown;
+        }
+
+        public static bool TryDeserialize<T>(string jsonString, out T? result)
+        {
+            try
+            {
+                result = JsonConvert.DeserializeObject<T>(jsonString);
+                return true;
+            }
+            catch (JsonException)
+            {
+                result = default;
+                return false;
+            }
+        }
+
+
         public static void WriteJsonToFile(string filePath, string json)
         {
-            if (!File.Exists(filePath))
-            {
-                File.Create(filePath);
-            }
             File.AppendAllText(filePath, json);
             File.AppendAllText(filePath, ";");
         }
@@ -159,5 +191,12 @@ namespace Sproutopia.Utilities
                 }
             }
         }
+    }
+
+    public enum LogType
+    {
+        Unknown,
+        FullLog,
+        DiffLog
     }
 }

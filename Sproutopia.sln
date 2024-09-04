@@ -60,6 +60,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Docs", "Docs", "{4A467AC5-6
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DummyBot", "DummyBot\DummyBot.csproj", "{48FCDFCB-04C6-44BE-A5A5-959D4E821D82}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Diff2Full", "Diff2Full\Diff2Full.csproj", "{0BD39F65-3DB1-425B-992F-773F54A87BDE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -110,6 +112,10 @@ Global
 		{48FCDFCB-04C6-44BE-A5A5-959D4E821D82}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{48FCDFCB-04C6-44BE-A5A5-959D4E821D82}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{48FCDFCB-04C6-44BE-A5A5-959D4E821D82}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0BD39F65-3DB1-425B-992F-773F54A87BDE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0BD39F65-3DB1-425B-992F-773F54A87BDE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0BD39F65-3DB1-425B-992F-773F54A87BDE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0BD39F65-3DB1-425B-992F-773F54A87BDE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

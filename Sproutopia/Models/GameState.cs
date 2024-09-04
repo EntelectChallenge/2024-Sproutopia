@@ -14,7 +14,7 @@ namespace Sproutopia.Models
 
         public int MaxTicks { set; get; }
         public int CurrentTick { get; set; }
-        public List<BotSnapshot> BotSnapshots { get; set; } = [];
+        public Dictionary<Guid, BotSnapshot> BotSnapshots { get; set; } = [];
         public int NumRows { get; private set; }
         public int NumCols { get; private set; }
         public int Seed { get; private set; }
@@ -136,14 +136,14 @@ namespace Sproutopia.Models
             return true;
         }
 
-        public DiffLog MapToDiffLog(GameState previous)
+        public DiffLog MapToDiffLog(GameState previous, DateTime timestamp)
         {
-            var prevDiffLog = MapToDiffLog(new DiffLog());
+            var prevDiffLog = MapToDiffLog(new DiffLog(), timestamp);
 
-            return MapToDiffLog(prevDiffLog);
+            return MapToDiffLog(prevDiffLog, timestamp);
         }
 
-        public DiffLog MapToDiffLog(DiffLog previous)
+        public DiffLog MapToDiffLog(DiffLog previous, DateTime timestamp)
         {
             var botIds = BotManager.BotIds();
             var botStates = BotManager.GetAllBotStates();
@@ -151,7 +151,8 @@ namespace Sproutopia.Models
             int currentTick = CurrentTick;
             Dictionary<Guid, int> leaderBoard = GardenManager.Leaderboard().ToDictionary(tuple => tuple.botId, tuple => tuple.claimedPercentage);
             Dictionary<Guid, CellCoordinate> botPositions = botStates.Values.ToDictionary(b => b.BotId, b => b.Position);
-            Dictionary<Guid, BotAction> botDirections = botStates.Values.ToDictionary(b => b.BotId, b => b.Momentum);
+            Dictionary<Guid, BotAction> botDirections = BotSnapshots.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Action);
+            Dictionary<Guid, BotAction> botMomentums = BotSnapshots.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Momentum);
             Dictionary<Guid, PowerUpType> botPowerUps = botStates
                 .Where(b => b.Value.GetActivePowerUp().HasValue)
                 .ToDictionary(b => b.Key, b => b.Value.GetActivePowerUp()!.Value);
@@ -166,17 +167,20 @@ namespace Sproutopia.Models
                 GardenManager.GetTrailCellsById(bot.Value).ToList().ForEach(c => trails[c] = bot.Key);
             }
             Dictionary<CellCoordinate, bool> weeds = GardenManager.ViewWeeds()
-                .SelectMany((row, rowIndex) => row.Select((value, colIndex) => new { RowIndex = rowIndex, ColIndex = colIndex, Value = value }))
-                .Where(cell => cell.Value).ToDictionary(c => new CellCoordinate(c.ColIndex, c.RowIndex), c => true);
+                .SelectMany((row, x) => row
+                    .Select((value, y) => new { CellCoordinate = new CellCoordinate(x, y), Value = value })
+                    .Where(item => item.Value))
+                .ToDictionary(item => item.CellCoordinate, item => item.Value);
             Dictionary<CellCoordinate, PowerUpType> powerUps = GardenManager.ViewPowerUps<PowerUpType>().ToDictionary(p => p.Coords, p => p.PowerupType);
             Dictionary<CellCoordinate, SuperPowerUpType> superPowerUps = GardenManager.ViewPowerUps<SuperPowerUpType>().ToDictionary(p => p.Coords, p => p.PowerupType);
 
             var current = new DiffLog(
+                timeStamp: timestamp,
                 currentTick: currentTick,
-                botSnapshots: BotSnapshots,
                 leaderBoard: leaderBoard,
                 botPositions: botPositions,
                 botDirections: botDirections,
+                botMomentums: botMomentums,
                 botPowerUps: botPowerUps,
                 botSuperPowerUps: botSuperPowerUps,
                 territory: territory,
@@ -189,15 +193,39 @@ namespace Sproutopia.Models
             return new DiffLog(previous, current);
         }
 
-        public GameStateDto MapAllToDto()
+        public GameStateDto MapAllToDto(DateTime timestamp)
         {
-            var heroWindow = GardenManager.ViewGardens().Select(rows =>
-                rows.Select(cols => (int)cols).ToArray()).ToArray();
+            var territory = GardenManager
+                .ViewTerritories()
+                .Select(rows => rows.Select(cols => (int)cols).ToArray())
+                .ToArray();
 
-            var powerUps = GardenManager.ViewPowerUps<PowerUpType>().Select(pu => new PowerUpLocation(new(pu.Coords.X, pu.Coords.Y), (int)pu.PowerupType)).ToArray();
+            var trails = GardenManager
+                .ViewTrails()
+                .Select(rows => rows.Select(cols => (int)cols).ToArray())
+                .ToArray();
+
+            var powerUps = GardenManager
+                .ViewPowerUps<PowerUpType>()
+                .Select(pu => new PowerUpLocation(new(pu.Coords.X, pu.Coords.Y), (int)pu.PowerupType))
+                .Union(GardenManager
+                    .ViewPowerUps<SuperPowerUpType>()
+                    .Select(pu => new PowerUpLocation(new(pu.Coords.X, pu.Coords.Y), (int)pu.PowerupType)))
+                .OrderBy(pu => pu.Location)
+                .ToArray();
             var weeds = GardenManager.ViewWeeds();
+            var breakCondition = weeds.Any(i => i.Any(j => j));
+            var botSnapshots = BotSnapshots.Select(kvp => kvp.Value).OrderBy(x => x.Index).ToList();
 
-            return new(CurrentTick, BotSnapshots, heroWindow, MapAllBotsToDto(), powerUps, weeds);
+            return new(
+                timeStamp: timestamp,
+                currentTick: CurrentTick,
+                botSnapshots: botSnapshots,
+                territory: territory,
+                trails: trails,
+                leaderBoard: GardenManager.Leaderboard().ToList(),
+                powerUps: powerUps,
+                weeds: weeds);
         }
 
         public GameInfoDTO MapToGameInfoDto()
@@ -236,7 +264,7 @@ namespace Sproutopia.Models
                 .Select(p => (p.Coords.X, p.Coords.Y, (int)p.PowerupType))
                 .Union(
                     GardenManager.ViewPowerUps<SuperPowerUpType>(x, y, HeroWindowSize)
-                    .Select(p => (p.Coords.X, p.Coords.Y, 10 + (int)p.PowerupType)))
+                    .Select(p => (p.Coords.X, p.Coords.Y, (int)p.PowerupType)))
                 .ToList();
 
             var powerUpLocations = powerUps.Select(p => new PowerUpLocation(new(p.X, p.Y), p.Item3)).ToArray();
@@ -258,8 +286,4 @@ namespace Sproutopia.Models
                 y: y);
         }
     }
-
-
-
-
 }

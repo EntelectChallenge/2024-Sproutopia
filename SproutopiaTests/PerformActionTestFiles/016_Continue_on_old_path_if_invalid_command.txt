@@ -12,7 +12,7 @@ StartingPositions: 1,1|5,1|5,5|1,5
 Actions: AN,AE,AE,AN
 
 Expected:
-AAaaaBB
+AAAaaBB
 AAA.BBB
 AAA.BBB
 .......

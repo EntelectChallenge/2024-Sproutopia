@@ -43,7 +43,7 @@ public class GameStateTests
     {
         // Arrange
         var botId = Guid.NewGuid();
-        _botManager.AddBot(new BotState(botId, new (10, 10)));
+        _botManager.AddBot(new BotState(0, botId, new (10, 10)));
         var gameState = new GameState(
             gameSettings: _gameSettings,
             botManager: _botManager,
@@ -75,7 +75,7 @@ public class GameStateTests
         // Arrange
         var botId = Guid.NewGuid();
 
-        _botManager.AddBot(new BotState(botId, new(10, 10)));
+        _botManager.AddBot(new BotState(0, botId, new(10, 10)));
         PowerUp powerUp = new(PowerUpType.TerritoryImmunity, new(5, 5));
         var powerUpId = powerUp.Id;
         List<PowerUp> powerUps = [];

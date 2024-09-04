@@ -146,38 +146,55 @@ namespace Visualiser
                 thread.Start();
                 thread.Join();
 
-                if (GameSettings.GetValue<bool>("DifferentialLoggingEnabled"))
-                {
-                    var diffLogs = Helpers.LoadJson<DiffLog>(logFilePath, ["\r\n", "\n", "\r"]);
-                    var newLand = Helpers.CreateJaggedArray<int[][]>(rows, cols);
-                    Helpers.SetAllValues(newLand, 255);
-                    var gameState = new GameStateDto(
-                        currentTick: 0,
-                        botSnapshots: [],
-                        land: newLand,
-                        bots: new Dictionary<Guid, BotStateDTO>(),
-                        powerUps: Array.Empty<PowerUpLocation>(),
-                        weeds: Helpers.CreateJaggedArray<bool[][]>(rows, cols)
-                        );
+                var logType = Helpers.IdentifyLogFile(logFilePath);
 
-                    foreach (var diffLog in diffLogs)
-                    {
-                        gameState = gameState.ApplyDiff(diffLog);
-                        GameStateLogs.Add(gameState);
-                    }
-                }
-                else
+                switch (logType)
                 {
-                    var logs = Helpers.LoadJson<GameStateDto>(logFilePath, ["\r\n", "\n", "\r"]);
+                    case LogType.FullLog:
+                        var logs = Helpers.LoadJson<GameStateDto>(logFilePath, ["\r\n", "\n", "\r"]);
 
-                    foreach (var log in logs)
-                    {
-                        GameStateLogs.Add(log);
-                    }
+                        foreach (var log in logs)
+                        {
+                            GameStateLogs.Add(log);
+                        }
+
+                        break;
+
+                    case LogType.DiffLog:
+                        var diffLogs = Helpers.LoadJson<DiffLog>(logFilePath, ["\r\n", "\n", "\r"]);
+
+                        var newTerritory = Helpers.CreateJaggedArray<int[][]>(rows, cols);
+                        Helpers.SetAllValues(newTerritory, 255);
+
+                        var newTrails = Helpers.CreateJaggedArray<int[][]>(rows, cols);
+                        Helpers.SetAllValues(newTrails, 255);
+
+                        var gameState = new GameStateDto(
+                            timeStamp: DateTime.Now,
+                            currentTick: 0,
+                            botSnapshots: [],
+                            territory: newTerritory,
+                            trails: newTrails,
+                            leaderBoard: [],
+                            powerUps: Array.Empty<PowerUpLocation>(),
+                            weeds: Helpers.CreateJaggedArray<bool[][]>(rows, cols)
+                            );
+
+                        foreach (var diffLog in diffLogs)
+                        {
+                            gameState = gameState.ApplyDiff(diffLog);
+                            GameStateLogs.Add(gameState);
+                        }
+
+                        break;
+
+                    default:
+                        Console.WriteLine("Unknown log file format.");
+                        return;
                 }
             }
 
-            _oneShotMouseState = OneShotMouseButton.GetState();
+             _oneShotMouseState = OneShotMouseButton.GetState();
 
             levelLoader = new(_padding, rows, cols);
             levelLoader.AddLevel(_initalPadding);
@@ -552,9 +569,9 @@ namespace Visualiser
 
                 #region Draw Bots
 
-                foreach (var x in GameState.Bots.Select((bot, index) => new { bot, index }))
+                foreach (var x in GameState.BotSnapshots.Select((bot, index) => new { bot, index }))
                 {
-                    var translatedPosition = levelLoader.Maps[x.bot.Value.X, x.bot.Value.Y];
+                    var translatedPosition = levelLoader.Maps[x.bot.X, x.bot.Y];
                     DrawTile(translatedPosition, x.index, GetBotColor(x.index));
                 }
 
@@ -569,9 +586,9 @@ namespace Visualiser
                 #region Print Game State
 
                 var sb = new StringBuilder();
-                foreach (var x in GameState.Bots.Select((bot, index) => new { bot, index }))
+                foreach (var x in GameState.BotSnapshots.Select((bot, index) => new { bot, index }))
                 {
-                    sb.AppendLine($"{x.index}:{x.bot.Key.ToString().Substring(0, 4)}...");
+                    sb.AppendLine($"{x.index}:{x.bot.BotId.ToString().Substring(0, 4)}...");
                 }
 
                 _spriteBatch.DrawString(_arial, sb.ToString(), new Vector2(810, 10), Color.Black);

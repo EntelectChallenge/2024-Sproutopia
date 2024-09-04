@@ -7,6 +7,7 @@ namespace Sproutopia.Models
 {
     public class BotState : IBotState
     {
+        public readonly int Index;
         public readonly string ConnectionId;
         public readonly string Nickname;
         private Queue<SproutBotCommand> _commandQueue;
@@ -21,8 +22,9 @@ namespace Sproutopia.Models
         private int _superPowerUpCountdown { get; set; } = 0;
         public int TieBreakingPoints { get; set; } = 0;
 
-        public BotState(Guid botId, string nickname, string connectionId, CellCoordinate position)
+        public BotState(int index, Guid botId, string nickname, string connectionId, CellCoordinate position)
         {
+            Index = index;
             _commandQueue = new();
             BotId = botId;
             LastCommand = new(botId, BotAction.IDLE);
@@ -32,8 +34,9 @@ namespace Sproutopia.Models
             Nickname = nickname;
             Position = RespawnPosition = position;
         }
-        public BotState(Guid botId, CellCoordinate position)
+        public BotState(int index, Guid botId, CellCoordinate position)
         {
+            Index = index;
             _commandQueue = new();
             BotId = botId;
             LastCommand = new(botId, BotAction.IDLE);

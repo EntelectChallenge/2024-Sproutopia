@@ -29,10 +29,6 @@ namespace Sproutopia.Models
         [Range(50, 250, ErrorMessage = "Value for {0} must be between {1} and {2} ms.")]
         public int TickRate { get; set; }
 
-        [JsonPropertyName("DifferentialLoggingEnabled")]
-        [Description("Enable differentail logging")]
-        public bool DifferentialLoggingEnabled { get; set; }
-
         [JsonPropertyName("PlayerWindowSize")]
         [Description("Size of the game world visible to each player")]
         [Range(8, 10, ErrorMessage = "Value for {0} must be between {1} and {2}.")]
@@ -122,6 +118,14 @@ namespace Sproutopia.Models
         [JsonPropertyName("InputLogFile")]
         [Description("File to be used for replaying bot inputs")]
         public string InputLogFile { get; set; }
+
+        [JsonPropertyName("DifferentialLoggingEnabled")]
+        [Description("Enable differentail logging")]
+        public bool DifferentialLoggingEnabled { get; set; }
+
+        [JsonPropertyName("FullLoggingEnabled")]
+        [Description("Enable full logging")]
+        public bool FullLoggingEnabled { get; set; }
     }
 
 }

@@ -39,4 +39,4 @@ docker build --no-cache --build-arg CONFIGURATION=Debug -t "%IMAGE_NAME%" .
 
 REM Run the Docker container
 :run_container
-docker run -it --rm -p 5000:5000 --name "%IMAGE_NAME%" -v %cd%/dockerlogs:/app/logs "%IMAGE_NAME%"
+docker run -it --rm -p 5000:5000 -e GameSettings__NumberOfPlayers=1 --name "%IMAGE_NAME%" -v "dockerlogs:/app/logs" "%IMAGE_NAME%"

@@ -84,8 +84,12 @@ namespace dummybot
                     case ConsoleKey.D:
                         SendCommand(BotAction.Right);
                         break;
-                    case ConsoleKey.Q:
+                    case ConsoleKey.I:
                         GetGameInfo();
+                        break;
+                    case ConsoleKey.Q:
+                        Console.Clear();
+                        isConnected = false;
                         break;
                     default:
                         Console.WriteLine("Please enter valid command : W/A/S/D");

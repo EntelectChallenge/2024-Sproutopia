@@ -4,6 +4,7 @@ using Logger.Utilities;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using Runner.DTOs;
 using Runner.Services;
 using Serilog;
 using Sproutopia.Managers;
@@ -22,7 +23,8 @@ namespace Sproutopia
         private readonly ICloudIntegrationService _cloudIntegrationService;
         private readonly GlobalSeededRandomizer _randomizer;
         private Serilog.Core.Logger _endGameLogger;
-        private Serilog.Core.Logger _gameLogger;
+        private Serilog.Core.Logger _fullLogger;
+        private Serilog.Core.Logger _diffLogger;
         private Serilog.Core.Logger _inputLogger;
 #if DEBUG
         private readonly IHubContext<VisualiserHub> _visualiserContext;
@@ -60,11 +62,23 @@ namespace Sproutopia
                 .WriteTo.File(Path.Combine(LOG_DIRECTORY, $"{filename}endGame.json"), outputTemplate: "{Message:lj}{NewLine}")
                 .CreateLogger();
 
-            _gameLogger = new LoggerConfiguration()
-                .Enrich.FromLogContext()
-                .MinimumLevel.Information()
-                .WriteTo.File(Path.Combine(LOG_DIRECTORY, $"{filename}.log"), outputTemplate: "{Message:lj}{NewLine}")
-                .CreateLogger();
+            if (_gameSettings.FullLoggingEnabled)
+            {
+                _fullLogger = new LoggerConfiguration()
+                    .Enrich.FromLogContext()
+                    .MinimumLevel.Information()
+                    .WriteTo.File(Path.Combine(LOG_DIRECTORY, $"{filename}_full.log"), outputTemplate: "{Message:lj}{NewLine}")
+                    .CreateLogger();
+            }
+
+            if (_gameSettings.DifferentialLoggingEnabled)
+            {
+                _diffLogger = new LoggerConfiguration()
+                    .Enrich.FromLogContext()
+                    .MinimumLevel.Information()
+                    .WriteTo.File(Path.Combine(LOG_DIRECTORY, $"{filename}_diff.log"), outputTemplate: "{Message:lj}{NewLine}")
+                    .CreateLogger();
+            }
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -82,7 +96,11 @@ namespace Sproutopia
             {
                 if (!stoppingToken.IsCancellationRequested)
                 {
-                    _gameLogger.Error("Worker stopped unexpectedly");
+                    if (_gameSettings.FullLoggingEnabled)
+                        _fullLogger.Error("Worker stopped unexpectedly");
+
+                    if (_gameSettings.DifferentialLoggingEnabled)
+                        _diffLogger.Error("Worker stopped unexpectedly");
                 }
             }
         }
@@ -90,6 +108,32 @@ namespace Sproutopia
         private async Task GameLoop(CancellationToken stoppingToken)
         {
             Dictionary<int, List<SproutBotCommand>> tickCommands = [];
+
+#if DEBUG
+            var debugTerritory = Helpers.CreateJaggedArray<int[][]>(_gameSettings.Rows, _gameSettings.Cols);
+            Helpers.SetAllValues(debugTerritory, 255);
+
+            var debugTrails = Helpers.CreateJaggedArray<int[][]>(_gameSettings.Rows, _gameSettings.Cols);
+            Helpers.SetAllValues(debugTrails, 255);
+
+            var debugGameState = new GameStateDto(
+                timeStamp: DateTime.UtcNow,
+                currentTick: 0,
+                botSnapshots: [],
+                territory: debugTerritory,
+                trails: debugTrails,
+                leaderBoard: [],
+                powerUps: [],
+                weeds: Helpers.CreateJaggedArray<bool[][]>(_gameSettings.Rows, _gameSettings.Cols)
+                );
+            for (int i = 0; i < _gameSettings.Rows; i++)
+            {
+                for (int j = 0; j < _gameSettings.Cols; j++)
+                {
+                    debugGameState.Land[i][j] = 255;
+                }
+            }
+#endif
 
             // Read input log if provided
             if (!string.IsNullOrEmpty(_gameSettings.InputLogFile))
@@ -171,6 +215,7 @@ namespace Sproutopia
                         var respawnList = new List<Guid>();
                         var interruptedList = new List<Guid>();
                         _gameState.BotSnapshots = [];
+                        var timestamp = DateTime.UtcNow;
 
                         #region STAGE 1
 
@@ -206,12 +251,7 @@ namespace Sproutopia
 
                         foreach (var command in sproutBotCommands)
                         {
-                            _gameState.BotSnapshots.Add(
-                                new BotSnapshot(
-                                    timeStamp: command.TimeStamp,
-                                    botId: command.BotId,
-                                    action: command.Action,
-                                    momentum: _gameState.BotManager.GetBotState(command.BotId).Momentum));
+                            var botState = _gameState.BotManager.GetBotState(command.BotId);
 
                             if (respawnList.Contains(command.BotId) || interruptedList.Contains(command.BotId))
                                 continue;
@@ -282,14 +322,33 @@ namespace Sproutopia
 
                         // STAGE 5
                         // Send feedback to bots & Visualiser
+
+                        // Update Bot Snapshots
+                        foreach (var (botId, bot) in _gameState.BotManager.GetAllBotStates())
+                        {
+                            _gameState.BotSnapshots[botId] =
+                                new BotSnapshot(
+                                    index: bot.Index,
+                                    botId: botId,
+                                    botName: bot.Nickname,
+                                    action: bot.LastCommand.Action,
+                                    momentum: bot.Momentum,
+                                    powerUp: bot.GetActivePowerUp() ?? Enums.PowerUpType.NONE,
+                                    superPowerUp: bot.GetActiveSuperPowerUp() ?? Enums.SuperPowerUpType.NONE,
+                                    x: bot.Position.X,
+                                    y: bot.Position.Y);
+                        }
+
                         // Update GameState and BotState
                         _gameState.UpdateState(_tickManager.CurrentTick);
+                        var gameStateDto = _gameState.MapAllToDto(timestamp);
 #if DEBUG
                         var currentPath = Directory.GetCurrentDirectory();
                         var filePath = Path.Combine(currentPath, "SampleFullGameLogsOutput.json");
-                        Helpers.WriteJsonToFile(filePath, JsonSerializer.Serialize(_gameState.MapAllToDto()));
-                        await _visualiserContext.Clients.All.SendAsync(VisualiserCommands.ReceiveInitialGameState,
-                            _gameState.MapAllToDto());
+                        Helpers.WriteJsonToFile(filePath, JsonSerializer.Serialize(gameStateDto));
+                        await _visualiserContext.Clients.All.SendAsync(
+                            VisualiserCommands.ReceiveInitialGameState,
+                            gameStateDto);
 #endif
 
                         await Parallel.ForEachAsync(_gameState.BotManager.GetAllBotStates(),
@@ -301,17 +360,21 @@ namespace Sproutopia
                                 _cloudIntegrationService.UpdatePlayer(bot.Key.ToString());
                             });
 
+                        if(_gameSettings.FullLoggingEnabled)
+                        {
+                            _fullLogger.Information("{@_gameState}", Newtonsoft.Json.JsonConvert.SerializeObject(gameStateDto)); // System.Text.Json does not render this object correctly, hence Newtonsoft
+                        }
+
                         if (_gameSettings.DifferentialLoggingEnabled)
                         {
+                            var diffLog = _gameState.MapToDiffLog(prevGameState, timestamp);
+#if DEBUG
+                            debugGameState = debugGameState.ApplyDiff(diffLog);
+                            var shouldBreak = Newtonsoft.Json.JsonConvert.SerializeObject(gameStateDto) != Newtonsoft.Json.JsonConvert.SerializeObject(debugGameState);
+#endif
+                            prevGameState = _gameState.MapToDiffLog(new DiffLog(), timestamp); // last remembered state has to be absolute, not relative
 
-                            var diffLog = _gameState.MapToDiffLog(prevGameState);
-                            prevGameState = _gameState.MapToDiffLog(new DiffLog()); // last remembered state has to be absolute, not relative
-
-                            _gameLogger.Information("{@_gameState}", Newtonsoft.Json.JsonConvert.SerializeObject(diffLog)); // System.Text.Json does not render this object correctly, hence Newtonsoft
-                        }
-                        else
-                        {
-                            _gameLogger.Information("{@_gameState}", Newtonsoft.Json.JsonConvert.SerializeObject(_gameState.MapAllToDto())); // System.Text.Json does not render this object correctly, hence Newtonsoft
+                            _diffLogger.Information("{@_gameState}", Newtonsoft.Json.JsonConvert.SerializeObject(diffLog)); // System.Text.Json does not render this object correctly, hence Newtonsoft
                         }
                         #endregion
                     }

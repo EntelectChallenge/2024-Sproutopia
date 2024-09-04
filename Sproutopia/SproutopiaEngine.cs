@@ -9,6 +9,7 @@ using Runner.Services;
 using Serilog;
 using Sproutopia.Managers;
 using Sproutopia.Models;
+using System.Text.Json;
 using System.Timers;
 using Timer = System.Timers.Timer;
 
@@ -113,7 +114,9 @@ namespace Sproutopia
                 await _runnerContext.Clients.All.SendAsync(RunnerCommands.ReceiveGameInformation, _gameState.MapToGameInfoDto());
                 _tickManager.StartTimer();
 #if DEBUG
-                await _visualiserContext.Clients.All.SendAsync(VisualiserCommands.ReceiveInitialGameState, _gameState.MapAllToDto());
+                await _visualiserContext.Clients.All.SendAsync(
+                    VisualiserCommands.ReceiveInitialGameState,
+                    _gameState.MapAllToDto(DateTime.UtcNow));
 #endif
             }
             catch (Exception ex) // Handle any uncaught exceptions

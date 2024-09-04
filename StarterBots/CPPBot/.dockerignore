@@ -1,0 +1,15 @@
+.gitignore
+.git/
+compile_commands.json
+setup.cmd
+setup.sh
+build.cmd
+build.sh
+.cache/
+.idea/
+.vscode/
+vcpkg/
+build/
+Dockerfile
+.dockerignore
+README.md

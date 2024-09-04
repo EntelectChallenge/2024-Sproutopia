@@ -10,9 +10,6 @@
         public int GameTick { get; set; }
         public int PowerUp { get; set; }
         public int SuperPowerUp { get; set; }
-        /// <summary>
-        /// Represents the current leader board with {Nickname, Territory percentage}   
-        /// </summary>
         public Dictionary<Guid, int> LeaderBoard { get; set; }
         public Location[] BotPostions { get; set; }
         public PowerUpLocation[] PowerUpLocations { get; set; }
@@ -67,7 +64,7 @@
         }
     }
 
-    public struct Location
+    public struct Location : IComparable
     {
         public int X { get; set; }
         public int Y { get; set; }
@@ -75,6 +72,16 @@
         {
             X = x;
             Y = y;
+        }
+
+        public int CompareTo(object? obj)
+        {
+            if (obj == null) return 1;
+            if (obj is Location otherLocation)
+            {
+                return ((X * 1000) + Y).CompareTo((otherLocation.X * 1000) + otherLocation.Y);
+            }
+            throw new ArgumentException("Object is not a Location");
         }
     }
 }

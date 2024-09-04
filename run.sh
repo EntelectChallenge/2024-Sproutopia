@@ -31,4 +31,4 @@ else
 fi
 
 # Run the Docker container
-docker run -it --rm -p 5000:5000 --name "$IMAGE_NAME" -v $(pwd)/dockerlogs:/app/logs "$IMAGE_NAME"
+docker run -it --rm -p 5000:5000 -e GameSettings__NumberOfPlayers=1 --name "$IMAGE_NAME" -v "$(pwd)/dockerlogs:/app/logs" "$IMAGE_NAME"

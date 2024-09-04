@@ -194,5 +194,17 @@ namespace Sproutopia.Utilities
 
             return sb.ToString();
         }
+
+        /// <summary>
+        /// Converts a dictionary into a List of tuples
+        /// </summary>
+        /// <typeparam name="TKey">Type of dictionary key</typeparam>
+        /// <typeparam name="TValue">Type of dictionary value</typeparam>
+        /// <param name="dictionary">Dictionary to be converted to a List of tuples</param>
+        /// <returns>List<(TKey, TValue)></returns>
+        public static List<(TKey, TValue)> ToTupleList<TKey, TValue>(this Dictionary<TKey, TValue> dictionary)
+        {
+            return dictionary.Select(kvp => (kvp.Key, kvp.Value)).ToList();
+        }
     }
 }

@@ -83,10 +83,10 @@ public class GardenManager : IGardenManager
         InitialiseGarden(botIds[2], _startingPositions[2].X, _startingPositions[2].Y, 3);
         InitialiseGarden(botIds[3], _startingPositions[3].X, _startingPositions[3].Y, 3);
 
-        _botManager.AddBot(new BotState(botIds[0], _startingPositions[0]));
-        _botManager.AddBot(new BotState(botIds[1], _startingPositions[1]));
-        _botManager.AddBot(new BotState(botIds[2], _startingPositions[2]));
-        _botManager.AddBot(new BotState(botIds[3], _startingPositions[3]));
+        _botManager.AddBot(new BotState(0, botIds[0], _startingPositions[0]));
+        _botManager.AddBot(new BotState(1, botIds[1], _startingPositions[1]));
+        _botManager.AddBot(new BotState(2, botIds[2], _startingPositions[2]));
+        _botManager.AddBot(new BotState(3, botIds[3], _startingPositions[3]));
     }
 
     /// <summary>
@@ -119,7 +119,7 @@ public class GardenManager : IGardenManager
 
         InitialiseGarden(botId, pos.X, pos.Y, 3);
 
-        _botManager.AddBot(new BotState(botId, nickname, connectionId, pos));
+        _botManager.AddBot(new BotState(_botManager.BotCount(), botId, nickname, connectionId, pos));
     }
 
     public int PowerUpCount()
@@ -286,7 +286,7 @@ public class GardenManager : IGardenManager
         int right = Math.Min(proximity.X + _width / 4, _width - 1);
         int bottom = Math.Min(proximity.Y + _height / 4, _height - 1);
 
-        // Etablish search area as a quadrant sized rectangle around the proximity point, clipped by a
+        // Establish search area as a quadrant sized rectangle around the proximity point, clipped by a
         // rectangle offset one cell from the boundaries (weeds are not allowed to spawn against the boundary)
         Geometry searchArea = new Polygon(new LinearRing(new[]
         {
@@ -979,7 +979,65 @@ public class GardenManager : IGardenManager
                     var garden = item.garden;
                     var index = item.i;
 
-                    if (garden.IsPointOnTrail(translatedCellCoord))
+                    if (garden.IsPointOnTrail(translatedCellCoord) && retval[cx][cy] != (CellType)index)
+                    {
+                        retval[cx][cy] = (CellType)(index + 4);
+                        break;
+                    }
+                }
+            }
+        }
+
+        return retval;
+    }
+
+    public CellType[][] ViewTerritories()
+    {
+        var retval = Helpers.CreateJaggedArray<CellType[][]>(_width, _height);
+
+        for (int cx = 0; cx < _width; cx++)
+        {
+            for (int cy = 0; cy < _height; cy++)
+            {
+                retval[cx][cy] = CellType.Unclaimed;
+
+                var translatedCellCoord = new CellCoordinate(cx, cy);
+
+                foreach (var item in _gardens.Values.Select((garden, i) => new { i, garden }))
+                {
+                    var garden = item.garden;
+                    var index = item.i;
+
+                    if (garden.IsCellInClaimedLand(translatedCellCoord))
+                    {
+                        retval[cx][cy] = (CellType)index;
+                        break;
+                    }
+                }
+            }
+        }
+
+        return retval;
+    }
+
+    public CellType[][] ViewTrails()
+    {
+        var retval = Helpers.CreateJaggedArray<CellType[][]>(_width, _height);
+
+        for (int cx = 0; cx < _width; cx++)
+        {
+            for (int cy = 0; cy < _height; cy++)
+            {
+                retval[cx][cy] = CellType.Unclaimed;
+
+                var translatedCellCoord = new CellCoordinate(cx, cy);
+
+                foreach (var item in _gardens.Values.Select((garden, i) => new { i, garden }))
+                {
+                    var garden = item.garden;
+                    var index = item.i;
+
+                    if (garden.IsPointOnTrail(translatedCellCoord) && retval[cx][cy] != (CellType)index)
                     {
                         retval[cx][cy] = (CellType)(index + 4);
                         break;

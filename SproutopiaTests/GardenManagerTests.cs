@@ -54,8 +54,8 @@ public class GardenManagerTests
     [TestCase(2, 2, 5, null, null, null, "000000FF03000000FF03000000FF03FFFFFFFFFF010101FF02", TestName = "ViewGardens(2, 2, 5)")]
     [TestCase(0, 0, null, 5, 3, null, "FEFEFEFEFEFEFE0000FE0000FE0000", TestName = "ViewGardens(0, 0, 5, 3)")]
     [TestCase(10, 10, null, 3, 3, null, "FEFEFEFEFEFEFEFEFE", TestName = "ViewGardens(10, 10, 3, 3)")]
-    [TestCase(null, null, null, null, null, 2, "000000FF03030300000007070303000400FF030303FF04FFFFFF06FF010101FF02060201010505020202010101FF020202", TestName = "ViewGardens({with trails in neutral territory})")]
-    [TestCase(null, null, null, null, null, 4, "000000FF03030300070707070603000400FF030603FF04FFFFFF06FF010401FF02060201040505050502010101FF020202", TestName = "ViewGardens({with trails in opposition territory})")]
+    [TestCase(null, null, null, null, null, 2, "000000FF03030300000007030303000000FF030303FF04FFFFFF06FF010101FF02020201010105020202010101FF020202", TestName = "ViewGardens({with trails in neutral territory})")]
+    [TestCase(null, null, null, null, null, 4, "000000FF03030300070707030603000000FF030603FF04FFFFFF06FF010401FF02020201040105050502010101FF020202", TestName = "ViewGardens({with trails in opposition territory})")]
     public void Test_ViewGardens(int? x, int? y, int? size, int? width, int? height, int? trailLen, string expected)
     {
         // Arrange
@@ -523,10 +523,10 @@ public class GardenManagerTests
         gardenManager.InitialiseGarden(id['C'], testData.startingPositions[2].X, testData.startingPositions[2].Y, 0);
         gardenManager.InitialiseGarden(id['D'], testData.startingPositions[3].X, testData.startingPositions[3].Y, 0);
 
-        _botManager.AddBot(new BotState(id['A'], testData.startingPositions[0]));
-        _botManager.AddBot(new BotState(id['B'], testData.startingPositions[1]));
-        _botManager.AddBot(new BotState(id['C'], testData.startingPositions[2]));
-        _botManager.AddBot(new BotState(id['D'], testData.startingPositions[3]));
+        _botManager.AddBot(new BotState(0, id['A'], testData.startingPositions[0]));
+        _botManager.AddBot(new BotState(1, id['B'], testData.startingPositions[1]));
+        _botManager.AddBot(new BotState(2, id['C'], testData.startingPositions[2]));
+        _botManager.AddBot(new BotState(3, id['D'], testData.startingPositions[3]));
 
         var garden0 = gardenManager.GetGardenById(id['A']);
         var garden1 = gardenManager.GetGardenById(id['B']);

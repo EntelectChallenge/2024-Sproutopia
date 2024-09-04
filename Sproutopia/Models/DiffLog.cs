@@ -7,11 +7,12 @@ namespace Sproutopia.Models
 {
     public class DiffLog
     {
+        public DateTime TimeStamp { get; set; }
         public int CurrentTick { get; set; }
-        public List<BotSnapshot> BotSnapshots { get; set; }
         public Dictionary<Guid, int> LeaderBoard { get; set; }
         public Dictionary<Guid, CellCoordinate> BotPositions { get; set; }
         public Dictionary<Guid, BotAction> BotDirections { get; set; }
+        public Dictionary<Guid, BotAction> BotMomentums { get; set; }
         public Dictionary<Guid, PowerUpType> BotPowerUps { get; set; }
         public Dictionary<Guid, SuperPowerUpType> BotSuperPowerUps { get; set; }
         public Dictionary<CellCoordinate, int> Territory { get; set; }
@@ -23,11 +24,12 @@ namespace Sproutopia.Models
 
         public DiffLog()
         {
+            TimeStamp = DateTime.UtcNow;
             CurrentTick = 0;
-            BotSnapshots = [];
             LeaderBoard = [];
             BotPositions = [];
             BotDirections = [];
+            BotMomentums = [];
             BotPowerUps = [];
             BotSuperPowerUps = [];
             Territory = [];
@@ -38,11 +40,12 @@ namespace Sproutopia.Models
         }
 
         public DiffLog(
+            DateTime timeStamp,
             int currentTick,
-            List<BotSnapshot> botSnapshots,
             Dictionary<Guid, int> leaderBoard,
             Dictionary<Guid, CellCoordinate> botPositions,
             Dictionary<Guid, BotAction> botDirections,
+            Dictionary<Guid, BotAction> botMomentums,
             Dictionary<Guid, PowerUpType> botPowerUps,
             Dictionary<Guid, SuperPowerUpType> botSuperPowerUps,
             Dictionary<CellCoordinate, int> territory,
@@ -51,11 +54,12 @@ namespace Sproutopia.Models
             Dictionary<CellCoordinate, PowerUpType> powerUps,
             Dictionary<CellCoordinate, SuperPowerUpType> superPowerUps)
         {
+            TimeStamp = timeStamp;
             CurrentTick = currentTick;
-            BotSnapshots = botSnapshots;
             LeaderBoard = leaderBoard;
             BotPositions = botPositions;
             BotDirections = botDirections;
+            BotMomentums = botMomentums;
             BotPowerUps = botPowerUps;
             BotSuperPowerUps = botSuperPowerUps;
             Territory = territory;
@@ -66,18 +70,19 @@ namespace Sproutopia.Models
         }
 
         public DiffLog(DiffLog before, DiffLog after) : this(
-                after.CurrentTick,
-                after.BotSnapshots,
-                GetChanges(before.LeaderBoard, after.LeaderBoard),
-                GetChanges(before.BotPositions, after.BotPositions),
-                GetChanges(before.BotDirections, after.BotDirections),
-                GetChanges(before.BotPowerUps, after.BotPowerUps),
-                GetChanges(before.BotSuperPowerUps, after.BotSuperPowerUps),
-                GetChanges(before.Territory, after.Territory, (int)CellType.Unclaimed),
-                GetChanges(before.Trails, after.Trails, (int)CellType.Unclaimed),
-                GetChanges(before.Weeds, after.Weeds),
-                GetChanges(before.PowerUps, after.PowerUps),
-                GetChanges(before.SuperPowerUps, after.SuperPowerUps))
+            after.TimeStamp,
+            after.CurrentTick,
+            GetChanges(before.LeaderBoard, after.LeaderBoard),
+            GetChanges(before.BotPositions, after.BotPositions),
+            GetChanges(before.BotDirections, after.BotDirections),
+            GetChanges(before.BotMomentums, after.BotMomentums),
+            GetChanges(before.BotPowerUps, after.BotPowerUps),
+            GetChanges(before.BotSuperPowerUps, after.BotSuperPowerUps),
+            GetChanges(before.Territory, after.Territory, (int)CellType.Unclaimed),
+            GetChanges(before.Trails, after.Trails, (int)CellType.Unclaimed),
+            GetChanges(before.Weeds, after.Weeds),
+            GetChanges(before.PowerUps, after.PowerUps),
+            GetChanges(before.SuperPowerUps, after.SuperPowerUps))
         {
         }
 

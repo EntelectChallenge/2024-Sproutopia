@@ -111,6 +111,18 @@ namespace Sproutopia.Managers
         public CellType[][] ViewGardens();
 
         /// <summary>
+        /// Serialize the territories as a jagged byte array
+        /// </summary>
+        /// <returns>A jagged array of CellType values representing the territories in the world</returns>
+        public CellType[][] ViewTerritories();
+
+        /// <summary>
+        /// Serialize the trails as a jagged byte array
+        /// </summary>
+        /// <returns>A jagged array of CellType values representing the trails in the world</returns>
+        public CellType[][] ViewTrails();
+
+        /// <summary>
         /// Serialise the map within a given square window, centred on the given coordinates.
         /// </summary>
         /// <param name="x">The x coordinate of the centre of the window.</param>

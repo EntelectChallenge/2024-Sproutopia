@@ -100,6 +100,16 @@ public class MockGardenManager : IGardenManager
         throw new NotImplementedException();
     }
 
+    public CellType[][] ViewTerritories()
+    {
+        throw new NotImplementedException();
+    }
+
+    public CellType[][] ViewTrails()
+    {
+        throw new NotImplementedException();
+    }
+
     public CellType[][] ViewGardens(int x, int y, int size)
     {
         throw new NotImplementedException();

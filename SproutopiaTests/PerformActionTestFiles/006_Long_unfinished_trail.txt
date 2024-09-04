@@ -27,7 +27,7 @@ Actions: AS,AS,AS,AS,AE,AE,AS,AS,AS,AS,AW,AW,AW,AW,AW,AS,AS,AE,AE,AE,AE,AE,AE,AE
 Expected:
 ....AAA.....aaaaaa..
 ....AAAaaa..a....a..
-....AaA..aaaa..aaa..
+....AAA..aaaa..aaa..
 .....a.........a....
 .....a.........a.BBB
 .....aaa.......a.BBB
