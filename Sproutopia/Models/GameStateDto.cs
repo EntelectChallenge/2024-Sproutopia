@@ -67,7 +67,7 @@ namespace Sproutopia.Models
         [JsonIgnore]
         public List<(string botName, int percentage)> LeaderBoardByName =>
             LeaderBoard
-            .Select(kvp => (BotSnapshots.FirstOrDefault(b => b.BotId == kvp.botId).BotName, kvp.percentage))
+            .Select(kvp => (BotSnapshots.FirstOrDefault(b => b.BotId == kvp.botId)?.BotName ?? "Unknown", kvp.percentage))
             .ToList();
 
         public PowerUpLocation[] PowerUps { get; set; } = [];

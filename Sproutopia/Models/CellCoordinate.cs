@@ -62,6 +62,13 @@ namespace Sproutopia.Models
             };
         }
 
+        public CellCoordinate Constrain(int width, int height)
+        {
+            return new CellCoordinate(
+                Math.Min(Math.Max(0, X), width-1),
+                Math.Min(Math.Max(0, Y), height-1));
+        }
+
         public bool WithinBounds(int width, int height)
         {
             return X >= 0 && Y >= 0 && X < width && Y < height;

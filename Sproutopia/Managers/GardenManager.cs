@@ -648,7 +648,7 @@ public class GardenManager : IGardenManager
         };
     }
 
-    private static Geometry GetFertilizerBlob(BotAction action, CellCoordinate newPosition)
+    private Geometry GetFertilizerBlob(BotAction action, CellCoordinate newPosition)
     {
         Geometry newBlob = newPosition.ToCellInPointCoordinateSystem();
 
@@ -678,8 +678,8 @@ public class GardenManager : IGardenManager
         };
 
         newBlob = newBlob.Union(posBehind.ToCellInPointCoordinateSystem());
-        newBlob = newBlob.Union(posBehindLeft.ToCellInPointCoordinateSystem());
-        newBlob = newBlob.Union(posBehindRight.ToCellInPointCoordinateSystem());
+        newBlob = newBlob.Union(posBehindLeft.Constrain(_width, _height).ToCellInPointCoordinateSystem());
+        newBlob = newBlob.Union(posBehindRight.Constrain(_width, _height).ToCellInPointCoordinateSystem());
 
         return newBlob;
     }
