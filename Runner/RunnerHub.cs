@@ -11,6 +11,8 @@ namespace Sproutopia
 {
     public class RunnerHub : Hub
     {
+        private static readonly object registrationLock = new object();
+
         private readonly IEngine _engine;
         private readonly ICloudIntegrationService _cloudIntegrationService;
         public RunnerHub(IEngine engine,
@@ -103,9 +105,11 @@ namespace Sproutopia
         {
             try
             {
-                _engine.RegisterBot(token, nickName, Context.ConnectionId);
+                lock (registrationLock)
+                {
+                    _engine.RegisterBot(token, nickName, Context.ConnectionId);
+                }
                 Log.Debug($"{token}: REGISTERED Bot With Nickname {nickName}");
-
                 await Clients.Caller.SendAsync(RunnerCommands.Registered, token);
                 await CheckStartConditions();
             }
